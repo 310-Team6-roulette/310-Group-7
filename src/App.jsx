@@ -7,6 +7,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import DocumentsPage from './pages/DocumentsPage'
+import TaskListPage from './pages/TaskListPage'
 
 /*
  * Routing table. Three kinds of route:
@@ -66,6 +67,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/tasks"
+        element={
+          <ProtectedRoute>
+            <TaskListPage />
+          </ProtectedRoute>
+        }
+/>
     </Routes>
   )
 }
