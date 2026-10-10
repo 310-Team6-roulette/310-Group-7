@@ -1,0 +1,133 @@
+import { useEffect, useState } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import confetti from 'canvas-confetti'
+import beaver from '../assets/beaver.png'
+import beaverArms from '../assets/beaverArms.png'
+import grassDouble from '../assets/grassDouble.svg'
+import ApplicationCard from '../components/ApplicationCard'
+import ApplicationModal from '../components/ApplicationModal'
+import PageShell, { BEAVER_POSITION, PRIMARY_PILL_CLASSES } from '../components/PageShell'
+import StatusColumn from '../components/StatusColumn'
+import {
+  deleteApplication,
+  fetchApplications,
+  insertApplication,
+  updateApplicationPositions,
+} from '../lib/applications'
+import useAuth from '../context/useAuth'
+import { COLUMNS, groupByStatus } from './dashboardData'
+import CalendarDay from '../components/CalendarDay'
+
+const NEW_APPLICATION_COLUMN = COLUMNS[0].id
+const OFFER_COLUMN = 'offer'
+// Mirrors brand-yellow/blue/pink/green in src/styles/preset.css — canvas-confetti
+// needs literal color strings, so these can't reference the CSS custom
+// properties directly. Keep in sync if the palette changes.
+const CONFETTI_COLORS = ['#F5E0AE', '#A6C2D2', '#D9BFB1', '#B8D2C7']
+const EMPTY_ITEMS = COLUMNS.reduce((acc, column) => ({ ...acc, [column.id]: [] }), {})
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function findContainer(items, id) {
+  if (id in items) return id
+  return Object.keys(items).find((key) => items[key].some((item) => item.id === id))
+}
+
+function CalendarPage() {
+  const { user } = useAuth()
+  const [items, setItems] = useState(EMPTY_ITEMS)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetchApplications()
+      .then((applications) => {
+        if (!cancelled) setItems(groupByStatus(applications, COLUMNS))
+      })
+      .catch((error) => {
+        console.error('Failed to load applications', error)
+        if (!cancelled) setLoadError(error)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+
+
+  return (
+    <PageShell>
+      <header className="mb-6 flex flex-col gap-4 px-1 pt-2 sm:flex-row sm:items-start sm:justify-between sm:px-2 md:pt-7 lg:pt-9">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Hello, Stranger<span aria-hidden="true">✦</span>
+          </h1>
+          <p className="mt-1 text-base">Welcome to your calendar</p>
+          {isLoading && <p className="mt-1 text-xs text-brand-black/60">Loading your calendar…</p>}
+          {loadError && (
+            <p className="mt-1 text-xs text-red-600">Couldn't load calendar. Try refreshing.</p>
+          )}
+        </div>
+      </header>
+
+      <img
+        src={beaver}
+        alt=""
+        aria-hidden="true"
+        className={`${BEAVER_POSITION} z-0`}
+      />
+
+      <div className="relative z-10 grid flex-1 grid-cols-7 grid-rows-6 gap-0">
+        {Array.from({ length : getDaysInMonth(year, month) }).map((_, index) => (
+          <CalendarDay
+            id={index.toString()}
+            title={index.toString()}
+            events={items['interview']}
+          />
+        ))}
+      </div>
+
+      <img
+        src={beaverArms}
+        alt=""
+        aria-hidden="true"
+        className={`${BEAVER_POSITION} z-20`}
+      />
+
+      <img
+        src={grassDouble}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 translate-x-1/2 opacity-80 xl:block"
+      />
+    </PageShell>
+  )
+}
+
+export default CalendarPage
