@@ -79,8 +79,21 @@ function CalendarPage() {
   const month = currentDate.getMonth();
 
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+  const getDayIndex = (index, days) => index - days * Math.floor(index/days) + 1;
+  const getRows = (year, month) => Math.ceil(getFirstDayOfMonth(year, month) + getDaysInMonth(year, month));
 
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDayIndex = getFirstDayOfMonth(year, month);
+  const rows = getRows(year, month);
 
+  const prevMonth = month === 0 ? 11 : month - 1;
+
+  const daysInPrevMonth = getDaysInMonth(year, prevMonth);
+
+  const borderStyle = {
+    border: '1px solid #00000065',
+  }
   return (
     <PageShell>
       <header className="mb-6 flex flex-col gap-4 px-1 pt-2 sm:flex-row sm:items-start sm:justify-between sm:px-2 md:pt-7 lg:pt-9">
@@ -103,11 +116,31 @@ function CalendarPage() {
         className={`${BEAVER_POSITION} z-0`}
       />
 
-      <div className="relative z-10 grid flex-1 grid-cols-7 grid-rows-6 gap-0">
-        {Array.from({ length : getDaysInMonth(year, month) }).map((_, index) => (
+      <div style={borderStyle} className="relative z-10 grid flex-1 grid-cols-7 grid-rows-1 gap-0">
+        {WEEKDAYS.map((day) => (
+          <div key={day} style={borderStyle} className="bg-brand-bg">
+            <p style = {{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }} className='font-semibold'>{day}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={borderStyle} className="relative z-10 grid flex-1 grid-cols-7 grid-rows-${rows} gap-0">
+        {Array.from({ length: firstDayIndex }).map((_, index) => (
           <CalendarDay
-            id={index.toString()}
-            title={index.toString()}
+            id={(daysInPrevMonth - (firstDayIndex - index) + 1).toString()}
+            title={(daysInPrevMonth - (firstDayIndex - index) + 1).toString()}
+            events={items['interview']}
+          />
+        ))}
+
+        {Array.from({ length: daysInMonth }).map((_, index) => (
+          <CalendarDay
+            id={getDayIndex(index, daysInMonth).toString()}
+            title={getDayIndex(index, daysInMonth).toString()}
             events={items['interview']}
           />
         ))}
