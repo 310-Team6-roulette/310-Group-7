@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { describeDeadline } from '../lib/notifications'
+import { enablePushNotifications } from '../lib/pushNotifications'
 
 function getPermission() {
   if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported'
@@ -17,6 +18,7 @@ function getLocalDateKey() {
 function NotificationPanel({ reminders, userId, className = '' }) {
   const [permission, setPermission] = useState(getPermission)
   const [permissionError, setPermissionError] = useState('')
+  const [pushStatus, setPushStatus] = useState('idle')
 
   useEffect(() => {
     if (permission !== 'granted' || reminders.length === 0) return
@@ -58,18 +60,20 @@ function NotificationPanel({ reminders, userId, className = '' }) {
     }
   }, [permission, reminders, userId])
 
-  async function requestPermission() {
+  async function enableAlerts() {
     setPermissionError('')
+    setPushStatus('loading')
 
     try {
-      const nextPermission = await Notification.requestPermission()
-      setPermission(nextPermission)
+      const result = await enablePushNotifications(userId)
+      setPermission(getPermission())
+      setPushStatus(result.status)
     } catch {
-      setPermissionError('Desktop notification permission could not be requested.')
+      setPermission(getPermission())
+      setPushStatus('failed')
+      setPermissionError('Background alerts could not be enabled. In-app alerts still work.')
     }
   }
-
-  if (reminders.length === 0) return null
 
   return (
     <section
@@ -81,30 +85,42 @@ function NotificationPanel({ reminders, userId, className = '' }) {
           <h2 id="deadline-reminders-title" className="text-lg font-bold">
             Upcoming deadlines
           </h2>
-          <ul className="mt-1 space-y-1 text-sm">
-            {reminders.map((application) => (
-              <li key={application.id}>
-                <strong>{application.company}</strong> — {application.role}{' '}
-                {describeDeadline(application.daysUntilDue)}
-              </li>
-            ))}
-          </ul>
+          {reminders.length > 0 ? (
+            <ul className="mt-1 space-y-1 text-sm">
+              {reminders.map((application) => (
+                <li key={application.id}>
+                  <strong>{application.company}</strong> — {application.role}{' '}
+                  {describeDeadline(application.daysUntilDue)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm">No application deadlines in the next two days.</p>
+          )}
           {permission === 'denied' && (
             <p className="mt-2 text-xs">Desktop alerts are blocked in your browser settings.</p>
           )}
           {permission === 'unsupported' && (
             <p className="mt-2 text-xs">This browser does not support desktop alerts.</p>
           )}
+          {pushStatus === 'subscribed' && (
+            <p className="mt-2 text-xs">Background deadline alerts are enabled.</p>
+          )}
+          {pushStatus === 'local-only' && (
+            <p className="mt-2 text-xs">Desktop alerts work while Pipeline is open.</p>
+          )}
           {permissionError && <p className="mt-2 text-xs text-red-700">{permissionError}</p>}
         </div>
 
-        {permission === 'default' && (
+        {(permission === 'default' ||
+          (permission === 'granted' && !['subscribed', 'local-only'].includes(pushStatus))) && (
           <button
             type="button"
-            onClick={requestPermission}
+            onClick={enableAlerts}
+            disabled={pushStatus === 'loading'}
             className="shrink-0 rounded-full bg-brand-black px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-black"
           >
-            Enable desktop alerts
+            {pushStatus === 'loading' ? 'Enabling…' : 'Enable desktop alerts'}
           </button>
         )}
       </div>
