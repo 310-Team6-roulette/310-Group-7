@@ -75,6 +75,14 @@ function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -93,7 +101,7 @@ function CalendarPage() {
   const daysInNextMonth = 35 - (daysInMonth + firstDayIndex);
 
   const borderStyle = {
-    border: '1px solid #00000065',
+    border: '0.5px solid #b9b9b9',
   }
   return (
     <PageShell>
@@ -108,6 +116,20 @@ function CalendarPage() {
             <p className="mt-1 text-xs text-red-600">Couldn't load calendar. Try refreshing.</p>
           )}
         </div>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h2>{MONTHS[month]} {year}</h2>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <button onClick={handlePrevMonth}>&lt;</button>
+            <button onClick={handleNextMonth}>&gt;</button>
+          </div>
+        </div>
       </header>
 
       <img
@@ -119,7 +141,7 @@ function CalendarPage() {
 
       <div style={borderStyle} className="relative z-10 grid flex-1 grid-cols-7 grid-rows-1 gap-0">
         {WEEKDAYS.map((day) => (
-          <div key={day} style={borderStyle} className="bg-brand-bg">
+          <div key={day} className="bg-brand-bg">
             <p style = {{
               display: 'flex',
               justifyContent: 'center',
@@ -160,13 +182,6 @@ function CalendarPage() {
         alt=""
         aria-hidden="true"
         className={`${BEAVER_POSITION} z-20`}
-      />
-
-      <img
-        src={grassDouble}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 translate-x-1/2 opacity-80 xl:block"
       />
     </PageShell>
   )
