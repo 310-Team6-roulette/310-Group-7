@@ -1,13 +1,29 @@
-
 import { useState } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable'
+
 import beaver from '../assets/beaver.png'
 import beaverArms from '../assets/beaverArms.png'
 import grassDouble from '../assets/grassDouble.svg'
+
 import PageShell, {
   BEAVER_POSITION,
   PRIMARY_PILL_CLASSES,
 } from '../components/PageShell'
 import TaskModal from '../components/TaskModal'
+import TaskColumn from '../components/TaskColumn'
+import TaskCard from '../components/TaskCard'
 
 // Define the task columns, including their unique IDs,
 // display names, and background colours.
@@ -23,20 +39,36 @@ const EMPTY_TASKS = Object.fromEntries(
   TASK_COLUMNS.map((column) => [column.id, []]),
 )
 
+// Find which column contains a particular task.
+// The ID may also refer to a column itself.
+function findContainer(tasks, id) {
+  if (Object.hasOwn(tasks, id)) return id
+
+  return Object.keys(tasks).find((columnId) =>
+    tasks[columnId].some((task) => task.id === id),
+  )
+}
+
 function TaskListPage() {
-  // Store tasks grouped by status and track whether the
-  // task creation modal is currently visible.
   const [tasks, setTasks] = useState(EMPTY_TASKS)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [activeTask, setActiveTask] = useState(null)
 
-  // Handle task creation using the data submitted from TaskModal.
-  // Validate the selected status, assign a unique ID, and add the
-  // new task to its corresponding column before closing the modal.
+  // Match the Dashboard's mouse and keyboard sensors.
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
   function handleAddTask(task) {
     const status = TASK_COLUMNS.some(
       (column) => column.id === task.status,
     )
-      // Default to the "To Do" column if an invalid status is provided.
+    // Default to the "To Do" column if an invalid status is provided.
       ? task.status
       : 'todo'
 
@@ -46,13 +78,116 @@ function TaskListPage() {
       status,
     }
 
-    // Update the task state while preserving existing tasks.
+     // Update the task state while preserving existing tasks.
     setTasks((prev) => ({
       ...prev,
       [status]: [...prev[status], newTask],
     }))
 
     setIsModalOpen(false)
+  }
+
+  function handleDragStart(event) {
+    const { active } = event
+
+    const container = findContainer(tasks, active.id)
+
+    if (!container) return
+
+    const draggedTask = tasks[container].find(
+      (task) => task.id === active.id,
+    )
+
+    setActiveTask(draggedTask ?? null)
+  }
+
+  function handleDragEnd(event) {
+    const { active, over } = event
+
+    setActiveTask(null)
+
+    // If dropped outside all columns, do nothing.
+    if (!over) return
+
+    setTasks((prev) => {
+      const sourceColumn = findContainer(prev, active.id)
+      const destinationColumn = findContainer(prev, over.id)
+
+      if (!sourceColumn || !destinationColumn) {
+        return prev
+      }
+
+      const sourceTasks = prev[sourceColumn]
+      const destinationTasks = prev[destinationColumn]
+
+      const sourceIndex = sourceTasks.findIndex(
+        (task) => task.id === active.id,
+      )
+
+      if (sourceIndex === -1) return prev
+
+      const draggedTask = sourceTasks[sourceIndex]
+
+      // Case 1: Reordering tasks within the same column.
+      if (sourceColumn === destinationColumn) {
+        const destinationIndex = destinationTasks.findIndex(
+          (task) => task.id === over.id,
+        )
+
+        // Dropping onto the column itself leaves order unchanged.
+        if (destinationIndex === -1) return prev
+
+        if (sourceIndex === destinationIndex) return prev
+
+        return {
+          ...prev,
+          [sourceColumn]: arrayMove(
+            sourceTasks,
+            sourceIndex,
+            destinationIndex,
+          ),
+        }
+      }
+
+      // Case 2: Moving a task into another column.
+      // Update its status to match the destination.
+      const updatedTask = {
+        ...draggedTask,
+        status: destinationColumn,
+      }
+
+      const remainingSourceTasks = sourceTasks.filter(
+        (task) => task.id !== active.id,
+      )
+
+      const destinationIndex = destinationTasks.findIndex(
+        (task) => task.id === over.id,
+      )
+
+      // Append to the bottom if dropped onto the empty column area.
+      const insertIndex =
+        destinationIndex === -1
+          ? destinationTasks.length
+          : destinationIndex
+
+      const updatedDestinationTasks = [...destinationTasks]
+
+      updatedDestinationTasks.splice(
+        insertIndex,
+        0,
+        updatedTask,
+      )
+
+      return {
+        ...prev,
+        [sourceColumn]: remainingSourceTasks,
+        [destinationColumn]: updatedDestinationTasks,
+      }
+    })
+  }
+
+  function handleDragCancel() {
+    setActiveTask(null)
   }
 
   return (
@@ -82,53 +217,34 @@ function TaskListPage() {
         aria-hidden="true"
         className={`${BEAVER_POSITION} z-0`}
       />
-      {/* Render the task board. Each column displays its title, task count, and associated tasks. */}
-      <div className="relative z-10 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {TASK_COLUMNS.map((column) => (
-          <section
-            key={column.id}
-            className={`${column.tone} flex min-h-56 flex-col rounded-[1.35rem] p-4`}
-          >
-            <header className="mb-7 flex items-center justify-between px-1">
-              <h2 className="flex items-center gap-2 text-base font-medium">
-                <span className="size-2 rounded-full bg-white" />
-                {column.title}
-              </h2>
 
-              <span className="min-w-8 rounded-full bg-white/70 px-2 py-1 text-center text-xs">
-                {tasks[column.id].length}
-              </span>
-            </header>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="relative z-10 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {TASK_COLUMNS.map((column) => (
+            <TaskColumn
+              key={column.id}
+              id={column.id}
+              title={column.title}
+              tone={column.tone}
+              tasks={tasks[column.id]}
+            />
+          ))}
+        </div>
 
-            {/* Display the tasks in the current column. */}
-            <div className="flex-1 space-y-3 overflow-y-auto">
-              {/* Render each task as a card within its current status column. */}
-              {tasks[column.id].map((task) => (
-                <article
-                  key={task.id}
-                  className="rounded-2xl bg-white p-4 shadow-sm"
-                >
-                  <h3 className="font-semibold">
-                    {task.title}
-                  </h3>
-
-                  {task.description && (
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-brand-black/70">
-                      {task.description}
-                    </p>
-                  )}
-
-                  {task.dueDate && (
-                    <p className="mt-3 text-xs text-brand-black/60">
-                      Due {task.dueDate}
-                    </p>
-                  )}
-                </article>
-              ))}
+        <DragOverlay>
+          {activeTask ? (
+            <div className="rotate-2 cursor-grabbing">
+              <TaskCard {...activeTask} />
             </div>
-          </section>
-        ))}
-      </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <img
         src={beaverArms}
