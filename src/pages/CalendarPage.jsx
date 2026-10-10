@@ -90,6 +90,7 @@ function CalendarPage() {
   const prevMonth = month === 0 ? 11 : month - 1;
 
   const daysInPrevMonth = getDaysInMonth(year, prevMonth);
+  const daysInNextMonth = 35 - (daysInMonth + firstDayIndex);
 
   const borderStyle = {
     border: '1px solid #00000065',
@@ -141,6 +142,14 @@ function CalendarPage() {
           <CalendarDay
             id={getDayIndex(index, daysInMonth).toString()}
             title={getDayIndex(index, daysInMonth).toString()}
+            events={items['interview']}
+          />
+        ))}
+
+        {Array.from({ length: daysInNextMonth }).map((_, index) => (
+          <CalendarDay
+            id={(index + 1).toString()}
+            title={(index + 1).toString()}
             events={items['interview']}
           />
         ))}
