@@ -54,7 +54,7 @@ function TaskListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeTask, setActiveTask] = useState(null)
 
-  // Match the Dashboard's mouse and keyboard sensors.
+  // Configure drag-and-drop for pointer and keyboard input.
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -68,7 +68,7 @@ function TaskListPage() {
     const status = TASK_COLUMNS.some(
       (column) => column.id === task.status,
     )
-    // Default to the "To Do" column if an invalid status is provided.
+      // Default to the "To Do" column if an invalid status is provided.
       ? task.status
       : 'todo'
 
@@ -77,8 +77,8 @@ function TaskListPage() {
       id: crypto.randomUUID(),
       status,
     }
-
-     // Update the task state while preserving existing tasks.
+    
+    // Update the task state while preserving existing tasks.
     setTasks((prev) => ({
       ...prev,
       [status]: [...prev[status], newTask],
@@ -87,6 +87,19 @@ function TaskListPage() {
     setIsModalOpen(false)
   }
 
+  function handleDeleteTask(taskId) {
+    const column = findContainer(tasks, taskId)
+    if (!column) return
+
+    setTasks((prev) => ({
+      ...prev,
+      [column]: prev[column].filter(
+        (task) => task.id !== taskId,
+      ),
+    }))
+  }
+
+  // Record the currently dragged task for the drag overlay.
   function handleDragStart(event) {
     const { active } = event
 
@@ -101,6 +114,7 @@ function TaskListPage() {
     setActiveTask(draggedTask ?? null)
   }
 
+  // Move or reorder a task when dragging finishes.
   function handleDragEnd(event) {
     const { active, over } = event
 
@@ -128,13 +142,12 @@ function TaskListPage() {
 
       const draggedTask = sourceTasks[sourceIndex]
 
-      // Case 1: Reordering tasks within the same column.
+      // Reorder tasks within the same column.
       if (sourceColumn === destinationColumn) {
         const destinationIndex = destinationTasks.findIndex(
           (task) => task.id === over.id,
         )
 
-        // Dropping onto the column itself leaves order unchanged.
         if (destinationIndex === -1) return prev
 
         if (sourceIndex === destinationIndex) return prev
@@ -149,13 +162,13 @@ function TaskListPage() {
         }
       }
 
-      // Case 2: Moving a task into another column.
-      // Update its status to match the destination.
+      // Move a task to another column and update its status.
       const updatedTask = {
         ...draggedTask,
         status: destinationColumn,
       }
 
+      // Remove the task from its original column.
       const remainingSourceTasks = sourceTasks.filter(
         (task) => task.id !== active.id,
       )
@@ -164,7 +177,7 @@ function TaskListPage() {
         (task) => task.id === over.id,
       )
 
-      // Append to the bottom if dropped onto the empty column area.
+      // Append to the end if dropped onto the column itself.
       const insertIndex =
         destinationIndex === -1
           ? destinationTasks.length
@@ -233,6 +246,7 @@ function TaskListPage() {
               title={column.title}
               tone={column.tone}
               tasks={tasks[column.id]}
+              onDeleteTask={handleDeleteTask}
             />
           ))}
         </div>
@@ -257,7 +271,7 @@ function TaskListPage() {
         src={grassDouble}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 translate-x-1/2 opacity-80 xl:block"
+        className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 xl:block"
       />
 
       <TaskModal

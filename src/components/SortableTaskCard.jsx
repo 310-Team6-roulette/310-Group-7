@@ -1,9 +1,8 @@
-
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import TaskCard from './TaskCard'
 
-function SortableTaskCard({ task }) {
+function SortableTaskCard({ task, onDelete }) {
   const {
     attributes,
     listeners,
@@ -34,7 +33,10 @@ function SortableTaskCard({ task }) {
         isDragging ? 'opacity-30' : ''
       }`}
     >
-      <TaskCard {...task} />
+      <TaskCard
+        {...task}
+        onDelete={() => onDelete(task.id)}
+      />
     </div>
   )
 }
