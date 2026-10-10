@@ -4,7 +4,7 @@ const TASK_STATUSES = [
   { id: 'todo', title: 'To Do' },
   { id: 'in_progress', title: 'In Progress' },
   { id: 'completed', title: 'Completed' },
-  { id: 'on_hold', title: 'On Hold' },
+  { id: 'due_soon', title: 'Due Soon' },
 ]
 
 function ModalField({

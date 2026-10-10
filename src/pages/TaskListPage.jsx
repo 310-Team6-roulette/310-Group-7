@@ -31,8 +31,17 @@ const TASK_COLUMNS = [
   { id: 'todo', title: 'To Do', tone: 'bg-brand-blue' },
   { id: 'in_progress', title: 'In Progress', tone: 'bg-brand-pink' },
   { id: 'completed', title: 'Completed', tone: 'bg-brand-green' },
-  { id: 'on_hold', title: 'On Hold', tone: 'bg-brand-yellow' },
 ]
+
+// Due Soon is a view-only column, not a task status.
+const DUE_SOON_COLUMN = {
+  id: 'due_soon',
+  title: 'Due Soon',
+  tone: 'bg-brand-yellow',
+}
+
+const DUE_SOON_DAYS = 7
+
 // Create an empty array for every task column.
 // Tasks will be loaded from Supabase.
 const EMPTY_TASKS = Object.fromEntries(
@@ -49,11 +58,47 @@ function findContainer(tasks, id) {
   )
 }
 
+// Find tasks due soon.
+// Completed tasks and tasks without a due date are excluded.
+function getDueSoonTasks(tasks) {
+  const now = new Date()
+
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  )
+
+  const cutoff = new Date(today)
+  cutoff.setDate(cutoff.getDate() + DUE_SOON_DAYS)
+
+  return Object.values(tasks)
+    .flat()
+    .filter((task) => {
+      if (!task.dueDate || task.status === 'completed') {
+        return false
+      }
+
+      // Date input values use YYYY-MM-DD format.
+      const [year, month, day] = task.dueDate
+        .split('-')
+        .map(Number)
+
+      const dueDate = new Date(year, month - 1, day)
+
+      return dueDate >= today && dueDate <= cutoff
+    })
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}
+
 function TaskListPage() {
   const [tasks, setTasks] = useState(EMPTY_TASKS)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeTask, setActiveTask] = useState(null)
   const [editingTask, setEditingTask] = useState(null)
+
+  // Due Soon is calculated from the existing tasks.
+  const dueSoonTasks = getDueSoonTasks(tasks)
 
   // Configure drag-and-drop for pointer and keyboard input.
   const sensors = useSensors(
@@ -65,11 +110,12 @@ function TaskListPage() {
     }),
   )
 
+  // Create a new task in the selected column.
   function handleAddTask(task) {
     const status = TASK_COLUMNS.some(
       (column) => column.id === task.status,
     )
-      // Default to the "To Do" column if an invalid status is provided.
+    // Default to the "To Do" column if an invalid status is provided.
       ? task.status
       : 'todo'
 
@@ -78,7 +124,7 @@ function TaskListPage() {
       id: crypto.randomUUID(),
       status,
     }
-    
+
     // Update the task state while preserving existing tasks.
     setTasks((prev) => ({
       ...prev,
@@ -88,24 +134,26 @@ function TaskListPage() {
     setIsModalOpen(false)
   }
 
+  // Find the task being edited and open the modal.
   function handleEditTask(taskId) {
-  const column = findContainer(tasks, taskId)
-  if (!column) {
-    return
-  }
+    const column = findContainer(tasks, taskId)
+    if (!column) { 
+      return
+    }
 
-  const task = tasks[column].find(
-    (item) => item.id === taskId,
-  )
+    const task = tasks[column].find(
+      (item) => item.id === taskId,
+    )
 
   if (!task) { 
     return
   }
 
-  setEditingTask(task)
-  setIsModalOpen(true)
-  } 
-  
+    setEditingTask(task)
+    setIsModalOpen(true)
+  }
+
+  // Save edits to an existing task.
   function handleUpdateTask(updatedTask) {
     setTasks((prev) => {
       const sourceColumn = findContainer(prev, updatedTask.id)
@@ -146,32 +194,34 @@ function TaskListPage() {
       }
 
     // Move the task if the user changed its status.
-    return {
-      ...prev,
-      [sourceColumn]: prev[sourceColumn].filter(
-        (item) => item.id !== task.id,
-      ),
-      [destinationColumn]: [
-        ...prev[destinationColumn],
-        task,
-      ],
-    }
-  })
+      return {
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(
+          (item) => item.id !== task.id,
+        ),
+        [destinationColumn]: [
+          ...prev[destinationColumn],
+          task,
+        ],
+      }
+    })
 
-  setIsModalOpen(false)
-  setEditingTask(null)
+    setIsModalOpen(false)
+    setEditingTask(null)
   }
 
   function handleDeleteTask(taskId) {
-    const column = findContainer(tasks, taskId)
-    if (!column) return
+    setTasks((prev) => {
+      const column = findContainer(prev, taskId)
+      if (!column) return prev
 
-    setTasks((prev) => ({
-      ...prev,
-      [column]: prev[column].filter(
-        (task) => task.id !== taskId,
-      ),
-    }))
+      return {
+        ...prev,
+        [column]: prev[column].filter(
+          (task) => task.id !== taskId,
+        ),
+      }
+    })
   }
 
   // Record the currently dragged task for the drag overlay.
@@ -198,11 +248,21 @@ function TaskListPage() {
     // If dropped outside all columns, do nothing.
     if (!over) return
 
+    // Due Soon column is read-only and cannot receive dragged tasks.
+    if (over.id === DUE_SOON_COLUMN.id) return
+
     setTasks((prev) => {
       const sourceColumn = findContainer(prev, active.id)
       const destinationColumn = findContainer(prev, over.id)
 
-      if (!sourceColumn || !destinationColumn) {
+      // Only real task columns are valid destinations.
+      if (
+        !sourceColumn ||
+        !destinationColumn ||
+        !TASK_COLUMNS.some(
+          (column) => column.id === destinationColumn,
+        )
+      ) {
         return prev
       }
 
@@ -328,6 +388,15 @@ function TaskListPage() {
               onEditTask={handleEditTask}
             />
           ))}
+
+          {/* Automatic, read-only Due Soon column */}
+          <TaskColumn
+            id={DUE_SOON_COLUMN.id}
+            title={DUE_SOON_COLUMN.title}
+            tone={DUE_SOON_COLUMN.tone}
+            tasks={dueSoonTasks}
+            readOnly
+          />
         </div>
 
         <DragOverlay>
@@ -354,16 +423,18 @@ function TaskListPage() {
       />
 
       {isModalOpen && (
-      <TaskModal
-        isOpen={isModalOpen}
-        taskToEdit={editingTask}
-        onClose={() => {
-          setIsModalOpen(false)
-          setEditingTask(null)
-        }}
-        onSubmit={editingTask ? handleUpdateTask : handleAddTask}
-      />
-    )}
+        <TaskModal
+          isOpen={isModalOpen}
+          taskToEdit={editingTask}
+          onClose={() => {
+            setIsModalOpen(false)
+            setEditingTask(null)
+          }}
+          onSubmit={
+            editingTask ? handleUpdateTask : handleAddTask
+          }
+        />
+      )}
     </PageShell>
   )
 }

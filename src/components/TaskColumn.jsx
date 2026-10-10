@@ -1,16 +1,26 @@
-
 import { useDroppable } from '@dnd-kit/core'
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import SortableTaskCard from './SortableTaskCard'
 
-function TaskColumn({ id, title, tone, tasks, onDeleteTask, onEditTask }) {
+import SortableTaskCard from './SortableTaskCard'
+import TaskCard from './TaskCard'
+
+function TaskColumn({
+  id,
+  title,
+  tone,
+  tasks,
+  onDeleteTask,
+  onEditTask,
+  readOnly = false,
+}) {
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: {
       type: 'column',
+      readOnly,
     },
   })
 
@@ -29,26 +39,35 @@ function TaskColumn({ id, title, tone, tasks, onDeleteTask, onEditTask }) {
         </span>
       </header>
 
-      <SortableContext
-        items={tasks.map((task) => task.id)}
-        strategy={verticalListSortingStrategy}
+      <div
+        ref={setNodeRef}
+        className={`min-h-24 flex-1 space-y-3 overflow-y-auto rounded-xl transition-colors ${
+          isOver && !readOnly ? 'bg-white/15' : ''
+        }`}
       >
-        <div
-          ref={setNodeRef}
-          className={`min-h-24 flex-1 space-y-3 overflow-y-auto rounded-xl transition-colors ${
-            isOver ? 'bg-white/15' : ''
-          }`}
-        >
-         {tasks.map((task) => (
-            <SortableTaskCard
+        {readOnly ? (
+          tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              {...task}
+            />
+          ))
+        ) : (
+          <SortableContext
+            items={tasks.map((task) => task.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {tasks.map((task) => (
+              <SortableTaskCard
                 key={task.id}
                 task={task}
                 onDelete={onDeleteTask}
                 onEdit={onEditTask}
-            />
+              />
             ))}
-        </div>
-      </SortableContext>
+          </SortableContext>
+        )}
+      </div>
     </section>
   )
 }
