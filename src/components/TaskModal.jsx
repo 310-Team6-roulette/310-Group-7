@@ -1,0 +1,226 @@
+import { useEffect, useRef, useState } from 'react'
+
+const TASK_STATUSES = [
+  { id: 'todo', title: 'To Do' },
+  { id: 'in_progress', title: 'In Progress' },
+  { id: 'completed', title: 'Completed' },
+  { id: 'on_hold', title: 'On Hold' },
+]
+
+function ModalField({
+  label,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  error,
+  required = false,
+}) {
+  const inputId = `task-${label.toLowerCase().replace(/\s+/g, '-')}`
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        htmlFor={inputId}
+        className="font-medium text-brand-bg"
+      >
+        {label} {required && '*'}
+      </label>
+
+      <input
+        id={inputId}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        aria-invalid={Boolean(error)}
+        className="min-w-0 rounded-full bg-input-bg px-5 py-3 text-brand-black outline-none placeholder:text-input-placeholder focus-visible:ring-2 focus-visible:ring-brand-yellow sm:py-3.5"
+      />
+
+      {error && (
+        <span className="px-2 text-sm text-red-300">
+          {error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+export default function TaskModal({ isOpen, onClose, onSubmit }) {
+  const dialogRef = useRef(null)
+
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [status, setStatus] = useState('todo')
+  const [errors, setErrors] = useState({})
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (isOpen && !dialog.open) {
+      dialog.showModal()
+    } else if (!isOpen && dialog.open) {
+      dialog.close()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    function handleNativeClose() {
+      onClose?.()
+    }
+
+    dialog.addEventListener('close', handleNativeClose)
+
+    return () => {
+      dialog.removeEventListener('close', handleNativeClose)
+    }
+  }, [onClose])
+
+  function validate() {
+    const newErrors = {}
+
+    if (!title.trim()) {
+      newErrors.title = 'Task title is required'
+    }
+
+    if (!TASK_STATUSES.some((item) => item.id === status)) {
+      newErrors.status = 'Please select a valid status'
+    }
+
+    return newErrors
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault()
+
+    const newErrors = validate()
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) return
+
+    onSubmit?.({
+      title: title.trim(),
+      description: description.trim(),
+      dueDate: dueDate || null,
+      status,
+    })
+
+    // Reset the form after a successful submission.
+    setTitle('')
+    setDescription('')
+    setDueDate('')
+    setStatus('todo')
+    setErrors({})
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="task-modal-title"
+      className="h-full max-h-none w-full max-w-none overflow-y-auto bg-transparent p-0 backdrop:bg-white/55"
+    >
+      <div className="flex min-h-full w-full items-center justify-center px-3 py-8 sm:p-6">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={() => dialogRef.current?.close()}
+          className="absolute inset-0 cursor-default bg-transparent"
+        />
+
+        <div className="relative w-full max-w-120">
+          <div className="relative z-20 flex items-center justify-center">
+            <h2
+              id="task-modal-title"
+              className="text-center text-3xl font-bold tracking-tight text-brand-black sm:text-5xl"
+            >
+              ADD TASK
+            </h2>
+          </div>
+
+          <div className="relative z-10 -mt-1 rounded-3xl bg-brand-black px-5 pb-6 pt-12 font-sans shadow-2xl sm:-mt-2 sm:rounded-[28px] sm:p-8 sm:pb-9 sm:pt-16">
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              className="flex flex-col gap-4 sm:gap-5"
+            >
+              <ModalField
+                label="Task Title"
+                placeholder="e.g. Write Google cover letter"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                error={errors.title}
+                required
+              />
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="task-description"
+                  className="font-medium text-brand-bg"
+                >
+                  Description
+                </label>
+
+                <textarea
+                  id="task-description"
+                  placeholder="Additional details (optional)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="min-w-0 resize-y rounded-2xl bg-input-bg px-5 py-3 text-brand-black outline-none placeholder:text-input-placeholder focus-visible:ring-2 focus-visible:ring-brand-yellow"
+                />
+              </div>
+
+              <ModalField
+                label="Due Date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="task-status"
+                  className="font-medium text-brand-bg"
+                >
+                  Status *
+                </label>
+
+                <select
+                  id="task-status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  aria-invalid={Boolean(errors.status)}
+                  className="min-w-0 rounded-full bg-input-bg px-5 py-3 text-brand-black outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow sm:py-3.5"
+                >
+                  {TASK_STATUSES.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+
+                {errors.status && (
+                  <span className="px-2 text-sm text-red-300">
+                    {errors.status}
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="mt-2 w-full self-center rounded-full bg-brand-yellow px-6 py-3.5 text-lg font-bold text-brand-black transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow active:scale-[0.98] sm:w-auto sm:min-w-[60%]"
+              >
+                Submit
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </dialog>
+  )
+}
