@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import TaskCard from './TaskCard'
 
-function SortableTaskCard({ task, onDelete }) {
+function SortableTaskCard({ task, onDelete, onEdit }) {
   const {
     attributes,
     listeners,
@@ -36,6 +36,7 @@ function SortableTaskCard({ task, onDelete }) {
       <TaskCard
         {...task}
         onDelete={() => onDelete(task.id)}
+        onEdit={() => onEdit(task.id)}
       />
     </div>
   )

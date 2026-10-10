@@ -53,6 +53,7 @@ function TaskListPage() {
   const [tasks, setTasks] = useState(EMPTY_TASKS)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeTask, setActiveTask] = useState(null)
+  const [editingTask, setEditingTask] = useState(null)
 
   // Configure drag-and-drop for pointer and keyboard input.
   const sensors = useSensors(
@@ -85,6 +86,80 @@ function TaskListPage() {
     }))
 
     setIsModalOpen(false)
+  }
+
+  function handleEditTask(taskId) {
+  const column = findContainer(tasks, taskId)
+  if (!column) {
+    return
+  }
+
+  const task = tasks[column].find(
+    (item) => item.id === taskId,
+  )
+
+  if (!task) { 
+    return
+  }
+
+  setEditingTask(task)
+  setIsModalOpen(true)
+  } 
+  
+  function handleUpdateTask(updatedTask) {
+    setTasks((prev) => {
+      const sourceColumn = findContainer(prev, updatedTask.id)
+
+      if (!sourceColumn) {
+        return prev
+      }
+
+      const originalTask = prev[sourceColumn].find(
+        (task) => task.id === updatedTask.id,
+      )
+
+      if (!originalTask) { 
+        return prev 
+      }
+
+      const destinationColumn = Object.hasOwn(
+        prev,
+        updatedTask.status,
+      )
+        ? updatedTask.status
+        : sourceColumn
+
+      const task = {
+        ...originalTask,
+        ...updatedTask,
+        status: destinationColumn,
+      }
+
+      // Update the task in its current column.
+      if (sourceColumn === destinationColumn) {
+        return {
+          ...prev,
+          [sourceColumn]: prev[sourceColumn].map((item) =>
+            item.id === task.id ? task : item,
+          ),
+        }
+      }
+
+    // Move the task if the user changed its status.
+    return {
+      ...prev,
+      [sourceColumn]: prev[sourceColumn].filter(
+        (item) => item.id !== task.id,
+      ),
+      [destinationColumn]: [
+        ...prev[destinationColumn],
+        task,
+      ],
+    }
+  })
+
+  setIsModalOpen(false)
+  setEditingTask(null)
   }
 
   function handleDeleteTask(taskId) {
@@ -217,7 +292,10 @@ function TaskListPage() {
 
         <button
           type="button"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingTask(null)
+            setIsModalOpen(true)
+          }}
           className={`w-full transition hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-black sm:w-auto ${PRIMARY_PILL_CLASSES}`}
         >
           + Add task
@@ -247,6 +325,7 @@ function TaskListPage() {
               tone={column.tone}
               tasks={tasks[column.id]}
               onDeleteTask={handleDeleteTask}
+              onEditTask={handleEditTask}
             />
           ))}
         </div>
@@ -274,11 +353,17 @@ function TaskListPage() {
         className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 xl:block"
       />
 
+      {isModalOpen && (
       <TaskModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleAddTask}
+        taskToEdit={editingTask}
+        onClose={() => {
+          setIsModalOpen(false)
+          setEditingTask(null)
+        }}
+        onSubmit={editingTask ? handleUpdateTask : handleAddTask}
       />
+    )}
     </PageShell>
   )
 }

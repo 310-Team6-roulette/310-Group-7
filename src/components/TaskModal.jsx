@@ -46,14 +46,15 @@ function ModalField({
   )
 }
 
-export default function TaskModal({ isOpen, onClose, onSubmit }) {
+export default function TaskModal({ isOpen, onClose, onSubmit, taskToEdit = null }) {
   const dialogRef = useRef(null)
 
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [status, setStatus] = useState('todo')
+  const [title, setTitle] = useState(taskToEdit?.title ?? '')
+  const [description, setDescription] = useState(taskToEdit?.description ?? '',)
+  const [dueDate, setDueDate] = useState(taskToEdit?.dueDate ?? '',)
+  const [status, setStatus] = useState(taskToEdit?.status ?? 'todo',)
   const [errors, setErrors] = useState({})
+  const isEditing = Boolean(taskToEdit)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -104,10 +105,11 @@ export default function TaskModal({ isOpen, onClose, onSubmit }) {
     if (Object.keys(newErrors).length > 0) return
 
     onSubmit?.({
-      title: title.trim(),
-      description: description.trim(),
-      dueDate: dueDate || null,
-      status,
+    ...(isEditing ? { id: taskToEdit.id } : {}),
+    title: title.trim(),
+    description: description.trim(),
+    dueDate: dueDate || null,
+    status,
     })
 
     // Reset the form after a successful submission.
@@ -139,7 +141,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit }) {
                 id="task-modal-title"
                 className="text-center text-3xl font-bold tracking-tight text-brand-black sm:text-5xl"
                 >
-                ADD TASK
+                {isEditing ? 'EDIT TASK' : 'ADD TASK'}
                 </h2>
             </div>
             {/* X-button to close the popup */}
@@ -237,7 +239,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit }) {
                 type="submit"
                 className="mt-2 w-full self-center rounded-full bg-brand-yellow px-6 py-3.5 text-lg font-bold text-brand-black transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow active:scale-[0.98] sm:w-auto sm:min-w-[60%]"
               >
-                Submit
+                {isEditing ? 'Save Changes' : 'Submit'}
               </button>
             </form>
           </div>
