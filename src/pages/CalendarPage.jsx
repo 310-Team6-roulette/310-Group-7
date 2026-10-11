@@ -1,30 +1,10 @@
 import { useEffect, useState } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  closestCorners,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import confetti from 'canvas-confetti'
 import beaver from '../assets/beaver.png'
 import beaverArms from '../assets/beaverArms.png'
-import grassDouble from '../assets/grassDouble.svg'
-import ApplicationCard from '../components/ApplicationCard'
-import ApplicationModal from '../components/ApplicationModal'
-import PageShell, { BEAVER_POSITION, PRIMARY_PILL_CLASSES } from '../components/PageShell'
-import StatusColumn from '../components/StatusColumn'
+import PageShell, { BEAVER_POSITION } from '../components/PageShell'
 import {
-  deleteApplication,
   fetchApplications,
-  insertApplication,
-  updateApplicationPositions,
 } from '../lib/applications'
-import useAuth from '../context/useAuth'
-import { COLUMNS, groupByStatus } from './dashboardData'
 import CalendarDay from '../components/CalendarDay'
 
 const EMPTY_ITEMS = new Map()
@@ -60,7 +40,6 @@ function getApplicationForDate(applicationsByDate, year, month, day) {
 }
 
 function CalendarPage() {
-  const { user } = useAuth()
   const [items, setItems] = useState(EMPTY_ITEMS)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
