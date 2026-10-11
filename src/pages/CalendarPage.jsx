@@ -76,6 +76,7 @@ function CalendarPage() {
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+  const today = new Date();
 
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
@@ -153,6 +154,11 @@ function CalendarPage() {
             id={getDayIndex(index, daysInMonth).toString()}
             title={getDayIndex(index, daysInMonth).toString()}
             events={getApplicationForDate(items, year, month, index + 1)}
+            isCurrent={
+              today.getFullYear() === year &&
+              today.getMonth() === month &&
+              today.getDate() === index + 1
+            }
           />
         ))}
 
