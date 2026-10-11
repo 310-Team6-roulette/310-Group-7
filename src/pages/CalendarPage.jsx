@@ -132,13 +132,7 @@ function CalendarPage() {
             <p className="mt-1 text-xs text-red-600">Couldn't load calendar. Try refreshing.</p>
           )}
         </div>
-        <div style={{
-          minWidth: '250px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexDirection: 'column',
-        }}>
+        <div className="flex flex-col justify-between items-end min-w-2xs mt-auto">
           <h2>{MONTHS[month]} {year}</h2>
           <div>
             <button onClick={handlePrevMonth} className="px-2 bg-gray-300 hover:bg-gray-400 rounded-l">Prev</button>
