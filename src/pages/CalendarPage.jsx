@@ -27,13 +27,7 @@ import useAuth from '../context/useAuth'
 import { COLUMNS, groupByStatus } from './dashboardData'
 import CalendarDay from '../components/CalendarDay'
 
-const NEW_APPLICATION_COLUMN = COLUMNS[0].id
-const OFFER_COLUMN = 'offer'
-// Mirrors brand-yellow/blue/pink/green in src/styles/preset.css — canvas-confetti
-// needs literal color strings, so these can't reference the CSS custom
-// properties directly. Keep in sync if the palette changes.
-const CONFETTI_COLORS = ['#F5E0AE', '#A6C2D2', '#D9BFB1', '#B8D2C7']
-const EMPTY_ITEMS = COLUMNS.reduce((acc, column) => ({ ...acc, [column.id]: [] }), {})
+const EMPTY_ITEMS = new Map()
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -41,9 +35,28 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-function findContainer(items, id) {
-  if (id in items) return id
-  return Object.keys(items).find((key) => items[key].some((item) => item.id === id))
+function groupByDate(applications) {
+  return new Map(
+    applications.map((application) => [
+      new Date(application.dueDate),
+      application,
+    ]),
+  )
+}
+
+function getApplicationForDate(applicationsByDate, year, month, day) {
+  const results = new Array();
+  for (const [date, application] of applicationsByDate) {
+    if (
+      date.getFullYear() === year &&
+      date.getMonth() === month &&
+      date.getDate() === day
+    ) {
+      results.push(application);
+    }
+  }
+
+  return results
 }
 
 function CalendarPage() {
@@ -57,7 +70,7 @@ function CalendarPage() {
 
     fetchApplications()
       .then((applications) => {
-        if (!cancelled) setItems(groupByStatus(applications, COLUMNS))
+        if (!cancelled) setItems(groupByDate(applications))
       })
       .catch((error) => {
         console.error('Failed to load applications', error)
@@ -73,7 +86,6 @@ function CalendarPage() {
   }, [])
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -89,19 +101,23 @@ function CalendarPage() {
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
   const getDayIndex = (index, days) => index - days * Math.floor(index/days) + 1;
-  const getRows = (year, month) => Math.ceil(getFirstDayOfMonth(year, month) + getDaysInMonth(year, month));
+  const getRows = (year, month) =>
+    Math.ceil((getFirstDayOfMonth(year, month) + getDaysInMonth(year, month)) / 7);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayIndex = getFirstDayOfMonth(year, month);
   const rows = getRows(year, month);
 
+  const prevYear = month === 0 ? year - 1 : year;
   const prevMonth = month === 0 ? 11 : month - 1;
+  const nextYear = month === 11 ? year + 1 : year;
+  const nextMonth = month === 11 ? 0 : month + 1;
 
   const daysInPrevMonth = getDaysInMonth(year, prevMonth);
-  const daysInNextMonth = 35 - (daysInMonth + firstDayIndex);
+  const daysInNextMonth = (rows * 7) - (daysInMonth + firstDayIndex);
 
   const borderStyle = {
-    border: '0.5px solid #b9b9b9',
+    border: '0.5px solid #d6d6d6',
   }
   return (
     <PageShell>
@@ -117,15 +133,14 @@ function CalendarPage() {
           )}
         </div>
         <div style={{
+          minWidth: '250px',
           display: 'flex',
-          flexDirection: 'column'
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'column',
         }}>
           <h2>{MONTHS[month]} {year}</h2>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
+          <div>
             <button onClick={handlePrevMonth}>&lt;</button>
             <button onClick={handleNextMonth}>&gt;</button>
           </div>
@@ -139,7 +154,7 @@ function CalendarPage() {
         className={`${BEAVER_POSITION} z-0`}
       />
 
-      <div style={borderStyle} className="relative z-10 grid flex-1 grid-cols-7 grid-rows-1 gap-0">
+      <div style={borderStyle} className="relative z-10 grid grid-cols-7 grid-rows-1 gap-0">
         {WEEKDAYS.map((day) => (
           <div key={day} className="bg-brand-bg">
             <p style = {{
@@ -156,7 +171,7 @@ function CalendarPage() {
           <CalendarDay
             id={(daysInPrevMonth - (firstDayIndex - index) + 1).toString()}
             title={(daysInPrevMonth - (firstDayIndex - index) + 1).toString()}
-            events={items['interview']}
+            events={getApplicationForDate(items, prevYear, prevMonth, (daysInPrevMonth - (firstDayIndex - index) + 1))}
           />
         ))}
 
@@ -164,7 +179,7 @@ function CalendarPage() {
           <CalendarDay
             id={getDayIndex(index, daysInMonth).toString()}
             title={getDayIndex(index, daysInMonth).toString()}
-            events={items['interview']}
+            events={getApplicationForDate(items, year, month, index + 1)}
           />
         ))}
 
@@ -172,7 +187,7 @@ function CalendarPage() {
           <CalendarDay
             id={(index + 1).toString()}
             title={(index + 1).toString()}
-            events={items['interview']}
+            events={getApplicationForDate(items, nextYear, nextMonth, index + 1)}
           />
         ))}
       </div>
