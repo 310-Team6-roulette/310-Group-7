@@ -174,6 +174,8 @@ request that has not been approved.
 - **Snyk:** monitors dependencies and opens pull requests for vulnerabilities,
   one per vulnerability. Merge these where practical; breaking changes may
   prevent some from being merged.
+- **Snyk:** `npm i -g snyk && snyk auth && snyk test` to manually check for vulnerabilities before committing.
+- CI runs both on every PR (see `.github/workflows/`).
 - **Dependencies:** declare all external dependencies in `package.json`. Do not
   add dependencies without the team's awareness.
 
