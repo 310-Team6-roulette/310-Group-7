@@ -141,8 +141,8 @@ function CalendarPage() {
         }}>
           <h2>{MONTHS[month]} {year}</h2>
           <div>
-            <button onClick={handlePrevMonth}>&lt;</button>
-            <button onClick={handleNextMonth}>&gt;</button>
+            <button onClick={handlePrevMonth} className="px-2 bg-gray-300 hover:bg-gray-400 rounded-l">Prev</button>
+            <button onClick={handleNextMonth} className="px-2 px-2 bg-gray-300 hover:bg-gray-400 rounded-r">Next</button>
           </div>
         </div>
       </header>
