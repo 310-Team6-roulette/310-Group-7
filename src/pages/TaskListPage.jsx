@@ -5,6 +5,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -115,6 +116,132 @@ function getDueSoonTasks(tasks) {
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
 
+// Prefer the pointer's current column, then a task within that column.
+// This keeps empty space in In Progress and other columns droppable.
+function detectTaskCollision(args) {
+  // Pointer coordinates are unavailable for keyboard dragging.
+  if (!args.pointerCoordinates) {
+    return closestCorners(args)
+  }
+
+  const collisions = pointerWithin(args)
+  const columnCollision = collisions.find(({ id }) =>
+    TASK_COLUMNS.some((column) => column.id === id),
+  )
+
+  // Never select a card in another column or the read-only Due Soon view.
+  if (!columnCollision) return []
+
+  const taskCollision = collisions.find(({ id }) => {
+    const container = args.droppableContainers.find(
+      (candidate) => candidate.id === id,
+    )
+
+    return container?.data.current?.type === 'task' &&
+      container.data.current.status === columnCollision.id
+  })
+
+  // Empty space (including below the last card) selects the column itself.
+  return [taskCollision ?? columnCollision]
+}
+
+function getDragMove(tasks, event) {
+  const { active, over } = event
+
+  if (!over || over.id === DUE_SOON_COLUMN.id) return null
+
+  const sourceColumn = findContainer(tasks, active.id)
+  const destinationColumn = findContainer(tasks, over.id)
+  const isTaskColumn = TASK_COLUMNS.some(
+    (column) => column.id === destinationColumn,
+  )
+
+  if (!sourceColumn || !destinationColumn || !isTaskColumn) {
+    return null
+  }
+
+  const sourceTasks = tasks[sourceColumn]
+  const destinationTasks = tasks[destinationColumn]
+  const sourceIndex = sourceTasks.findIndex(
+    (task) => task.id === active.id,
+  )
+
+  if (sourceIndex === -1) return null
+
+  if (sourceColumn === destinationColumn) {
+    // Dropping on the column background moves the task to the bottom.
+    const destinationIndex = over.id === destinationColumn
+      ? destinationTasks.length - 1
+      : destinationTasks.findIndex((task) => task.id === over.id)
+
+    if (destinationIndex === -1 || sourceIndex === destinationIndex) {
+      return null
+    }
+
+    return {
+      sourceColumn,
+      destinationColumn,
+      updatedTasks: {
+        ...tasks,
+        [sourceColumn]: arrayMove(
+          sourceTasks,
+          sourceIndex,
+          destinationIndex,
+        ),
+      },
+    }
+  }
+
+  const updatedTask = {
+    ...sourceTasks[sourceIndex],
+    status: destinationColumn,
+  }
+  const remainingSourceTasks = sourceTasks.filter(
+    (task) => task.id !== active.id,
+  )
+  const destinationIndex = destinationTasks.findIndex(
+    (task) => task.id === over.id,
+  )
+  const pointerY =
+    typeof event.activatorEvent?.clientY === 'number'
+      ? event.activatorEvent.clientY + event.delta.y
+      : null
+  const isLastTask = destinationIndex === destinationTasks.length - 1
+  const droppedAtBottom =
+    isLastTask &&
+    pointerY !== null &&
+    pointerY > over.rect.top + over.rect.height / 2
+  const insertIndex =
+    destinationIndex === -1 || droppedAtBottom
+      ? destinationTasks.length
+      : destinationIndex
+  const updatedDestinationTasks = [...destinationTasks]
+
+  updatedDestinationTasks.splice(insertIndex, 0, updatedTask)
+
+  return {
+    sourceColumn,
+    destinationColumn,
+    updatedTasks: {
+      ...tasks,
+      [sourceColumn]: remainingSourceTasks,
+      [destinationColumn]: updatedDestinationTasks,
+    },
+  }
+}
+
+async function saveTaskMove(sourceColumn, destinationColumn, updatedTasks) {
+  if (sourceColumn === destinationColumn) {
+    await updateTaskPositions(sourceColumn, updatedTasks[sourceColumn])
+    return
+  }
+
+  await Promise.all([
+    updateTaskPositions(sourceColumn, updatedTasks[sourceColumn]),
+    updateTaskPositions(destinationColumn, updatedTasks[destinationColumn]),
+  ])
+}
+
 function TaskListPage() {
   const [tasks, setTasks] = useState(EMPTY_TASKS)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -221,7 +348,7 @@ function TaskListPage() {
       throw new Error('Task not found')
     }
 
-    const originalTask = tasks[sourceColumn].find(
+    const originalTask = tasks[sourceColumn].some(
       (task) => task.id === updatedTask.id,
     )
 
@@ -348,144 +475,22 @@ function TaskListPage() {
 
   // Move or reorder a task when dragging finishes.
   async function handleDragEnd(event) {
-    const { active, over } = event
-
     setActiveTask(null)
 
     // Prevent another drag while a previous move is saving.
     if (isSavingPositions.current) return
 
-    // If dropped outside all columns, do nothing.
-    if (!over) {
-      return
-    }
+    const move = getDragMove(tasks, event)
+    if (!move) return
 
-    // Due Soon column is read-only and cannot receive dragged tasks.
-    if (over.id === DUE_SOON_COLUMN.id) {
-      return
-    }
-    const sourceColumn = findContainer(tasks, active.id)
-    const destinationColumn = findContainer(tasks, over.id)
-
-    // Only real task columns are valid destinations.
-    if (
-      !sourceColumn ||
-      !destinationColumn ||
-      !TASK_COLUMNS.some(
-        (column) => column.id === destinationColumn,
-      )
-    ) {
-      return
-    }
-
-    const sourceTasks = tasks[sourceColumn]
-    const destinationTasks = tasks[destinationColumn]
-
-    const sourceIndex = sourceTasks.findIndex(
-      (task) => task.id === active.id,
-    )
-
-    if (sourceIndex === -1) return
-
-    const draggedTask = sourceTasks[sourceIndex]
-    let updatedTasks
-
-    // Reorder tasks within the same column.
-    if (sourceColumn === destinationColumn) {
-      const destinationIndex = destinationTasks.findIndex(
-        (task) => task.id === over.id,
-      )
-
-      if (destinationIndex === -1) return
-      if (sourceIndex === destinationIndex) return
-
-      updatedTasks = {
-        ...tasks,
-        [sourceColumn]: arrayMove(
-          sourceTasks,
-          sourceIndex,
-          destinationIndex,
-        ),
-      }
-    } else {
-      // Move a task to another column and update its status.
-      const updatedTask = {
-        ...draggedTask,
-        status: destinationColumn,
-      }
-
-      // Remove the task from its original column.
-      const remainingSourceTasks = sourceTasks.filter(
-        (task) => task.id !== active.id,
-      )
-
-      
-      const destinationIndex = destinationTasks.findIndex(
-        (task) => task.id === over.id,
-      )
-
-      // Calculate the pointer's position when the drag finishes.
-      const pointerY =
-        typeof event.activatorEvent?.clientY === 'number'
-          ? event.activatorEvent.clientY + event.delta.y
-          : null
-
-      // Check if the nearest target is the last task.
-      const isLastTask =
-        destinationIndex === destinationTasks.length - 1
-
-      // Insert after the last task if dropped below its midpoint.
-      const droppedAtBottom =
-        isLastTask &&
-        pointerY !== null &&
-        pointerY > over.rect.top + over.rect.height / 2
-
-      // Append to the bottom when dropped onto the column itself
-      // or below the last task. Otherwise, insert before the target.
-      const insertIndex =
-        destinationIndex === -1 || droppedAtBottom
-          ? destinationTasks.length
-          : destinationIndex
-
-
-      const updatedDestinationTasks = [...destinationTasks]
-
-      updatedDestinationTasks.splice(
-        insertIndex,
-        0,
-        updatedTask,
-      )
-
-      updatedTasks = {
-        ...tasks,
-        [sourceColumn]: remainingSourceTasks,
-        [destinationColumn]: updatedDestinationTasks,
-      }
-    }
+    const { sourceColumn, destinationColumn, updatedTasks } = move
+    const previousTasks = tasks
     setTasks(updatedTasks)
     setSaveError(null)
     isSavingPositions.current = true
 
     try {
-      if (sourceColumn === destinationColumn) {
-        // Save the new ordering within one column.
-        await updateTaskPositions(
-          sourceColumn,
-          updatedTasks[sourceColumn],
-        )
-      } else {
-        // Save both the original and destination columns.
-        await Promise.all([
-          updateTaskPositions(
-            sourceColumn,
-            updatedTasks[sourceColumn],
-          ),
-          updateTaskPositions(
-            destinationColumn,
-            updatedTasks[destinationColumn],
-          ),
-        ])
-      }
+      await saveTaskMove(sourceColumn, destinationColumn, updatedTasks)
 
       // Celebrate only after successfully saving a move into Completed.
       if (sourceColumn !== 'completed' && destinationColumn === 'completed') {
@@ -504,7 +509,7 @@ function TaskListPage() {
         setTasks(savedTasks)
       } catch (fetchError) {
         console.error('Failed to reload tasks', fetchError)
-        setTasks(tasks)
+        setTasks(previousTasks)
       }
     } finally {
       isSavingPositions.current = false
@@ -527,12 +532,9 @@ function TaskListPage() {
           </p>
 
           {isLoading && (
-            <p
-              role="status"
-              className="mt-1 text-xs text-brand-black/60"
-            >
+            <output className="mt-1 text-xs text-brand-black/60">
               Loading your tasks…
-            </p>
+            </output>
           )}
 
           {loadError && (
@@ -576,7 +578,7 @@ function TaskListPage() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={detectTaskCollision}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}

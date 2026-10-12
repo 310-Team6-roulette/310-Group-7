@@ -132,6 +132,13 @@ export default function TaskModal({ isOpen, onClose, onSubmit, taskToEdit = null
     }
   }
 
+  let submitButtonLabel = 'Submit'
+  if (isSubmitting) {
+    submitButtonLabel = 'Saving...'
+  } else if (isEditing) {
+    submitButtonLabel = 'Save Changes'
+  }
+
   return (
     <dialog
       ref={dialogRef}
@@ -263,11 +270,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, taskToEdit = null
                 disabled={isSubmitting}
                 className="mt-2 w-full self-center rounded-full bg-brand-yellow px-6 py-3.5 text-lg font-bold text-brand-black transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[60%]"
               >
-                {isSubmitting
-                  ? 'Saving...'
-                  : isEditing
-                    ? 'Save Changes'
-                    : 'Submit'}
+                {submitButtonLabel}
               </button>
 
             </form>
