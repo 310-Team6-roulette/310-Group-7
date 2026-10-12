@@ -19,20 +19,20 @@ import PageShell, { BEAVER_POSITION, PRIMARY_PILL_CLASSES } from '../components/
 import StatusColumn from '../components/StatusColumn'
 import {
   deleteApplication,
-  fetchApplicationsByColumn,
+  fetchApplications,
   insertApplication,
   updateApplicationPositions,
 } from '../lib/applications'
 import useAuth from '../context/useAuth'
-import { COLUMNS } from './dashboardData'
+import { COLUMNS, groupByStatus } from './dashboardData'
 
-const NEW_APPLICATION_COLUMN = COLUMNS[0].title
-const OFFER_COLUMN = 'Offer'
+const NEW_APPLICATION_COLUMN = COLUMNS[0].id
+const OFFER_COLUMN = 'offer'
 // Mirrors brand-yellow/blue/pink/green in src/styles/preset.css — canvas-confetti
 // needs literal color strings, so these can't reference the CSS custom
 // properties directly. Keep in sync if the palette changes.
 const CONFETTI_COLORS = ['#F5E0AE', '#A6C2D2', '#D9BFB1', '#B8D2C7']
-const EMPTY_ITEMS = COLUMNS.reduce((acc, column) => ({ ...acc, [column.title]: [] }), {})
+const EMPTY_ITEMS = COLUMNS.reduce((acc, column) => ({ ...acc, [column.id]: [] }), {})
 
 function findContainer(items, id) {
   if (id in items) return id
@@ -64,11 +64,12 @@ function DashboardPage() {
   useEffect(() => {
     let cancelled = false
 
-    fetchApplicationsByColumn(COLUMNS)
-      .then((grouped) => {
-        if (!cancelled) setItems(grouped)
+    fetchApplications()
+      .then((applications) => {
+        if (!cancelled) setItems(groupByStatus(applications, COLUMNS))
       })
       .catch((error) => {
+        console.error('Failed to load applications', error)
         if (!cancelled) setLoadError(error)
       })
       .finally(() => {
@@ -156,6 +157,7 @@ function DashboardPage() {
 
   function handleAddApplication(application) {
     const status = NEW_APPLICATION_COLUMN
+    console.log('status:', status, 'keys:', Object.keys(items))
     const position = items[status].length
 
     insertApplication({ ...application, status, position, userId: user.id })
@@ -221,11 +223,11 @@ function DashboardPage() {
         <div className="relative z-10 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {COLUMNS.map((column) => (
             <StatusColumn
-              key={column.title}
-              id={column.title}
+              key={column.id}
+              id={column.id}
               title={column.title}
               tone={column.tone}
-              applications={items[column.title]}
+              applications={items[column.id]}
               onDeleteApplication={handleDeleteApplication}
             />
           ))}
