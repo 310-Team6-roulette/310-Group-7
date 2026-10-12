@@ -8,6 +8,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import DocumentsPage from './pages/DocumentsPage'
 import TaskListPage from './pages/TaskListPage'
+import CalendarPage from './pages/CalendarPage'
 
 /*
  * Routing table. Three kinds of route:
@@ -75,6 +76,13 @@ function App() {
           </ProtectedRoute>
         }
 />
+        path="/calendar"
+        element={
+          <ProtectedRoute>
+            <CalendarPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }

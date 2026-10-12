@@ -133,7 +133,7 @@ All three tables have RLS enabled with a `for all` policy scoped
 `with check`. Anonymous clients get nothing at all.
 
 This is not belt-and-braces. It is the only thing separating users. In
-`src/lib/applications.js`, `fetchApplicationsByColumn` runs `select('*')` with
+`src/lib/applications.js`, `fetchApplications` runs `select('*')` with
 **no client-side filter on `user_id`**. It returns every row the database is
 willing to hand over, and the policy is what makes that set the caller's own
 rows. `src/lib/tasks.js` also fetches tasks without an explicit `user_id`
