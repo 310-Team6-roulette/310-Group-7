@@ -129,3 +129,13 @@ export async function updateTaskPositions(status, tasks) {
     throw failed.error
   }
 }
+// Persist both affected columns after dropping a task.
+export async function persistTaskMove({ sourceColumn, destinationColumn, updatedTasks }) {
+  const columns = sourceColumn === destinationColumn
+    ? [sourceColumn]
+    : [sourceColumn, destinationColumn]
+
+  await Promise.all(
+    columns.map((column) => updateTaskPositions(column, updatedTasks[column])),
+  )
+}

@@ -1,59 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  closestCorners,
-  pointerWithin,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable'
 import confetti from 'canvas-confetti'
-
 import beaver from '../assets/beaver.png'
 import beaverArms from '../assets/beaverArms.png'
 import grassDouble from '../assets/grassDouble.svg'
-
 import PageShell, {
   BEAVER_POSITION,
   PRIMARY_PILL_CLASSES,
 } from '../components/PageShell'
+import TaskBoard from '../components/TaskBoard'
 import TaskModal from '../components/TaskModal'
-import TaskColumn from '../components/TaskColumn'
-import TaskCard from '../components/TaskCard'
-import {
-  fetchTasksByColumn,
-  insertTask,
-  updateTask,
-  deleteTask,
-  updateTaskPositions,
-} from '../lib/tasks'
+import useAuth from '../context/useAuth'
+import useTaskList from '../components/hooks/useTaskList'
 
-// Define the task columns, including their unique IDs,
-// display names, and background colours.
-const TASK_COLUMNS = [
-  { id: 'todo', title: 'To Do', tone: 'bg-brand-blue' },
-  { id: 'in_progress', title: 'In Progress', tone: 'bg-brand-pink' },
-  { id: 'completed', title: 'Completed', tone: 'bg-brand-green' },
-]
-
-// Due Soon is a view-only column, not a task status.
-const DUE_SOON_COLUMN = {
-  id: 'due_soon',
-  title: 'Due Soon',
-  tone: 'bg-brand-yellow',
-}
-
-const DUE_SOON_DAYS = 7
-
-// Use the same brand-colour confetti effect as the Dashboard's Offer column.
 const CONFETTI_COLORS = ['#F5E0AE', '#A6C2D2', '#D9BFB1', '#B8D2C7']
 
+// Celebration animation for completing a task. 
 function celebrateCompletedTask() {
   const fire = (options) =>
     confetti({
@@ -67,458 +27,15 @@ function celebrateCompletedTask() {
   fire({ particleCount: 60, spread: 55, angle: 120, origin: { x: 0.75, y: 0.65 } })
 }
 
-// Create an empty array for every task column.
-// Tasks will be loaded from Supabase.
-const EMPTY_TASKS = Object.fromEntries(
-  TASK_COLUMNS.map((column) => [column.id, []]),
-)
-
-// Find which column contains a particular task.
-// The ID may also refer to a column itself.
-function findContainer(tasks, id) {
-  if (Object.hasOwn(tasks, id)) return id
-
-  return Object.keys(tasks).find((columnId) =>
-    tasks[columnId].some((task) => task.id === id),
-  )
-}
-
-// Find tasks due soon.
-// Completed tasks and tasks without a due date are excluded.
-function getDueSoonTasks(tasks) {
-  const now = new Date()
-
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  )
-
-  const cutoff = new Date(today)
-  cutoff.setDate(cutoff.getDate() + DUE_SOON_DAYS)
-
-  return Object.values(tasks)
-    .flat()
-    .filter((task) => {
-      if (!task.dueDate || task.status === 'completed') {
-        return false
-      }
-
-      // Date input values use YYYY-MM-DD format.
-      const [year, month, day] = task.dueDate
-        .split('-')
-        .map(Number)
-
-      const dueDate = new Date(year, month - 1, day)
-
-      return dueDate >= today && dueDate <= cutoff
-    })
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-}
-
-// Prefer the pointer's current column, then a task within that column.
-// This keeps empty space in In Progress and other columns droppable.
-function detectTaskCollision(args) {
-  // Pointer coordinates are unavailable for keyboard dragging.
-  if (!args.pointerCoordinates) {
-    return closestCorners(args)
-  }
-
-  const collisions = pointerWithin(args)
-  const columnCollision = collisions.find(({ id }) =>
-    TASK_COLUMNS.some((column) => column.id === id),
-  )
-
-  // Never select a card in another column or the read-only Due Soon view.
-  if (!columnCollision) return []
-
-  const taskCollision = collisions.find(({ id }) => {
-    const container = args.droppableContainers.find(
-      (candidate) => candidate.id === id,
-    )
-
-    return container?.data.current?.type === 'task' &&
-      container.data.current.status === columnCollision.id
-  })
-
-  // Empty space (including below the last card) selects the column itself.
-  return [taskCollision ?? columnCollision]
-}
-
-function getDragMove(tasks, event) {
-  const { active, over } = event
-
-  if (!over || over.id === DUE_SOON_COLUMN.id) return null
-
-  const sourceColumn = findContainer(tasks, active.id)
-  const destinationColumn = findContainer(tasks, over.id)
-  const isTaskColumn = TASK_COLUMNS.some(
-    (column) => column.id === destinationColumn,
-  )
-
-  if (!sourceColumn || !destinationColumn || !isTaskColumn) {
-    return null
-  }
-
-  const sourceTasks = tasks[sourceColumn]
-  const destinationTasks = tasks[destinationColumn]
-  const sourceIndex = sourceTasks.findIndex(
-    (task) => task.id === active.id,
-  )
-
-  if (sourceIndex === -1) return null
-
-  if (sourceColumn === destinationColumn) {
-    // Dropping on the column background moves the task to the bottom.
-    const destinationIndex = over.id === destinationColumn
-      ? destinationTasks.length - 1
-      : destinationTasks.findIndex((task) => task.id === over.id)
-
-    if (destinationIndex === -1 || sourceIndex === destinationIndex) {
-      return null
-    }
-
-    return {
-      sourceColumn,
-      destinationColumn,
-      updatedTasks: {
-        ...tasks,
-        [sourceColumn]: arrayMove(
-          sourceTasks,
-          sourceIndex,
-          destinationIndex,
-        ),
-      },
-    }
-  }
-
-  const updatedTask = {
-    ...sourceTasks[sourceIndex],
-    status: destinationColumn,
-  }
-  const remainingSourceTasks = sourceTasks.filter(
-    (task) => task.id !== active.id,
-  )
-  const destinationIndex = destinationTasks.findIndex(
-    (task) => task.id === over.id,
-  )
-  const pointerY =
-    typeof event.activatorEvent?.clientY === 'number'
-      ? event.activatorEvent.clientY + event.delta.y
-      : null
-  const isLastTask = destinationIndex === destinationTasks.length - 1
-  const droppedAtBottom =
-    isLastTask &&
-    pointerY !== null &&
-    pointerY > over.rect.top + over.rect.height / 2
-  const insertIndex =
-    destinationIndex === -1 || droppedAtBottom
-      ? destinationTasks.length
-      : destinationIndex
-  const updatedDestinationTasks = [...destinationTasks]
-
-  updatedDestinationTasks.splice(insertIndex, 0, updatedTask)
-
-  return {
-    sourceColumn,
-    destinationColumn,
-    updatedTasks: {
-      ...tasks,
-      [sourceColumn]: remainingSourceTasks,
-      [destinationColumn]: updatedDestinationTasks,
-    },
-  }
-}
-
-async function saveTaskMove(sourceColumn, destinationColumn, updatedTasks) {
-  if (sourceColumn === destinationColumn) {
-    await updateTaskPositions(sourceColumn, updatedTasks[sourceColumn])
-    return
-  }
-
-  await Promise.all([
-    updateTaskPositions(sourceColumn, updatedTasks[sourceColumn]),
-    updateTaskPositions(destinationColumn, updatedTasks[destinationColumn]),
-  ])
-}
-
+// Keep the task state separate for each authenticated account.
 function TaskListPage() {
-  const [tasks, setTasks] = useState(EMPTY_TASKS)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [activeTask, setActiveTask] = useState(null)
-  const [editingTask, setEditingTask] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
-  const isSavingPositions = useRef(false)
-  const [saveError, setSaveError] = useState(null)
+  const { user } = useAuth()
+  return <TaskListContent key={user?.id} />
+}
 
-  // Due Soon is calculated from the existing tasks.
-  const dueSoonTasks = getDueSoonTasks(tasks)
-
-  // Retrieve the user's saved tasks when the page opens.
-  useEffect(() => {
-    let cancelled = false
-
-    fetchTasksByColumn(TASK_COLUMNS)
-      .then((grouped) => {
-        if (!cancelled) {
-          setTasks(grouped)
-          setLoadError(null)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error('Failed to load tasks', error)
-          setLoadError(error)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
-      })
-
-    // Prevent requests from updating state after leaving the page.
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Configure drag-and-drop for pointer and keyboard input.
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  )
-
-  // Create a new task in the selected column.
-  async function handleAddTask(task) {
-    const status = TASK_COLUMNS.some(
-      (column) => column.id === task.status,
-    )
-      // Default to the "To Do" column if an invalid status is provided.
-      ? task.status
-      : 'todo'
-
-    // New tasks are placed at the end of their selected column.
-    const position = tasks[status].length
-
-    const newTask = await insertTask({
-      ...task,
-      status,
-      position,
-    })
-
-    // Update the task state while preserving existing tasks.
-    setTasks((prev) => ({
-      ...prev,
-      [status]: [...prev[status], newTask],
-    }))
-
-    setIsModalOpen(false)
-  }
-
-  // Find the task being edited and open the modal.
-  function handleEditTask(taskId) {
-    const column = findContainer(tasks, taskId)
-    if (!column) {
-      return
-    }
-
-    const task = tasks[column].find(
-      (item) => item.id === taskId,
-    )
-
-    if (!task) {
-      return
-    }
-
-    setEditingTask(task)
-    setIsModalOpen(true)
-  }
-
-  // Save edits to an existing task.
-  async function handleUpdateTask(updatedTask) {
-    const sourceColumn = findContainer(tasks, updatedTask.id)
-
-    if (!sourceColumn) {
-      throw new Error('Task not found')
-    }
-
-    const originalTask = tasks[sourceColumn].some(
-      (task) => task.id === updatedTask.id,
-    )
-
-    if (!originalTask) {
-      throw new Error('Task not found')
-    }
-
-  
-    const destinationColumn = TASK_COLUMNS.some(
-      (column) => column.id === updatedTask.status,
-    )
-      ? updatedTask.status
-      : sourceColumn
-
-    // Prepare the changes that will be saved to Supabase.
-    const changes = {
-      title: updatedTask.title,
-      description: updatedTask.description,
-      dueDate: updatedTask.dueDate,
-      status: destinationColumn,
-    }
-
-    // If the task changes columns, place it at the end of
-    // the destination column.
-    if (sourceColumn !== destinationColumn) {
-      changes.position = Math.max(
-        -1,
-        ...tasks[destinationColumn].map(
-          (task, index) => task.position ?? index,
-        ),
-      ) + 1
-    }
-
-    // Wait for Supabase to save the edits.
-    const savedTask = await updateTask(updatedTask.id, changes)
-
-    setTasks((prev) => {
-      const currentColumn = findContainer(prev, savedTask.id)
-
-      if (!currentColumn) {
-        return prev
-      }
-
-      // Update the task without moving it if the status is unchanged.
-      if (currentColumn === savedTask.status) {
-        return {
-          ...prev,
-          [currentColumn]: prev[currentColumn].map((task) =>
-            task.id === savedTask.id ? savedTask : task,
-          ),
-        }
-      }
-
-      // Move the task if the user changed its status.
-      return {
-        ...prev,
-        [currentColumn]: prev[currentColumn].filter(
-          (task) => task.id !== savedTask.id,
-        ),
-        [savedTask.status]: [
-          ...prev[savedTask.status],
-          savedTask,
-        ],
-      }
-    })
-
-    // Celebrate when an edited task moves into Completed.
-    if (sourceColumn !== 'completed' && savedTask.status === 'completed') {
-      celebrateCompletedTask()
-    }
-
-    setIsModalOpen(false)
-    setEditingTask(null)
-  }
-
-  async function handleDeleteTask(taskId) {
-    const column = findContainer(tasks, taskId)
-
-    if (!column) {
-      return
-    }
-
-    setSaveError(null)
-
-    try {
-      // Delete the task from Supabase first.
-      await deleteTask(taskId)
-
-      // Remove the task from React after deletion succeeds.
-      setTasks((prev) => {
-        const currentColumn = findContainer(prev, taskId)
-
-        if (!currentColumn) return prev
-
-        return {
-          ...prev,
-          [currentColumn]: prev[currentColumn].filter(
-            (task) => task.id !== taskId,
-          ),
-        }
-      })
-    } catch (error) {
-      console.error('Failed to delete task', error)
-      setSaveError('Could not delete task. Please try again.')
-    }
-  }
-
-
-  // Record the currently dragged task for the drag overlay.
-  function handleDragStart(event) {
-    const { active } = event
-
-    const container = findContainer(tasks, active.id)
-
-    if (!container) return
-
-    const draggedTask = tasks[container].find(
-      (task) => task.id === active.id,
-    )
-
-    setActiveTask(draggedTask ?? null)
-  }
-
-
-  // Move or reorder a task when dragging finishes.
-  async function handleDragEnd(event) {
-    setActiveTask(null)
-
-    // Prevent another drag while a previous move is saving.
-    if (isSavingPositions.current) return
-
-    const move = getDragMove(tasks, event)
-    if (!move) return
-
-    const { sourceColumn, destinationColumn, updatedTasks } = move
-    const previousTasks = tasks
-    setTasks(updatedTasks)
-    setSaveError(null)
-    isSavingPositions.current = true
-
-    try {
-      await saveTaskMove(sourceColumn, destinationColumn, updatedTasks)
-
-      // Celebrate only after successfully saving a move into Completed.
-      if (sourceColumn !== 'completed' && destinationColumn === 'completed') {
-        celebrateCompletedTask()
-      }
-    } catch (error) {
-      console.error('Failed to save task position', error)
-
-      setSaveError(
-        'Could not save task movement. Please try again.',
-      )
-
-      // Restore the last saved state from Supabase.
-      try {
-        const savedTasks = await fetchTasksByColumn(TASK_COLUMNS)
-        setTasks(savedTasks)
-      } catch (fetchError) {
-        console.error('Failed to reload tasks', fetchError)
-        setTasks(previousTasks)
-      }
-    } finally {
-      isSavingPositions.current = false
-    }
-  }
-
-  function handleDragCancel() {
-    setActiveTask(null)
-  }
+// Composes the page
+function TaskListContent() {
+  const taskList = useTaskList({ onTaskCompleted: celebrateCompletedTask })
 
   return (
     <PageShell>
@@ -527,101 +44,48 @@ function TaskListPage() {
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Hello, Stranger<span aria-hidden="true">✦</span>
           </h1>
-          <p className="mt-1 text-base">
-            Welcome to your task dashboard
-          </p>
+          <p className="mt-1 text-base">Welcome to your task dashboard</p>
 
-          {isLoading && (
+          {taskList.isLoading && (
             <output className="mt-1 text-xs text-brand-black/60">
               Loading your tasks…
             </output>
           )}
-
-          {loadError && (
-            <p
-              role="alert"
-              className="mt-1 text-xs text-red-600"
-            >
+          {taskList.loadError && (
+            <p role="alert" className="mt-1 text-xs text-red-600">
               Couldn't load tasks. Try refreshing.
             </p>
           )}
-          
-          {saveError && (
-            <p
-              role="alert"
-              className="mt-1 text-xs text-red-600"
-            >
-              {saveError}
+          {taskList.saveError && (
+            <p role="alert" className="mt-1 text-xs text-red-600">
+              {taskList.saveError}
             </p>
           )}
         </div>
 
         <button
           type="button"
-          disabled={isLoading || Boolean(loadError)}
-          onClick={() => {
-            setEditingTask(null)
-            setIsModalOpen(true)
-          }}
+          disabled={taskList.isLoading || Boolean(taskList.loadError)}
+          onClick={taskList.openAddModal}
           className={`w-full transition hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${PRIMARY_PILL_CLASSES}`}
         >
           + Add task
         </button>
       </header>
 
-      <img
-        src={beaver}
-        alt=""
-        aria-hidden="true"
-        className={`${BEAVER_POSITION} z-0`}
+      <img src={beaver} alt="" aria-hidden="true" className={`${BEAVER_POSITION} z-0`} />
+
+      <TaskBoard
+        tasks={taskList.tasks}
+        dueSoonTasks={taskList.dueSoonTasks}
+        setTasks={taskList.setTasks}
+        setSaveError={taskList.setSaveError}
+        onDeleteTask={taskList.removeTask}
+        onEditTask={taskList.openEditModal}
+        onTaskCompleted={celebrateCompletedTask}
       />
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={detectTaskCollision}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        <div className="relative z-10 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {TASK_COLUMNS.map((column) => (
-            <TaskColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              tone={column.tone}
-              tasks={tasks[column.id]}
-              onDeleteTask={handleDeleteTask}
-              onEditTask={handleEditTask}
-            />
-          ))}
-
-          {/* Automatic, read-only Due Soon column */}
-          <TaskColumn
-            id={DUE_SOON_COLUMN.id}
-            title={DUE_SOON_COLUMN.title}
-            tone={DUE_SOON_COLUMN.tone}
-            tasks={dueSoonTasks}
-            readOnly
-          />
-        </div>
-
-        <DragOverlay>
-          {activeTask ? (
-            <div className="rotate-2 cursor-grabbing">
-              <TaskCard {...activeTask} />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-
-      <img
-        src={beaverArms}
-        alt=""
-        aria-hidden="true"
-        className={`${BEAVER_POSITION} z-20`}
-      />
-
+      <img src={beaverArms} alt="" aria-hidden="true" className={`${BEAVER_POSITION} z-20`} />
       <img
         src={grassDouble}
         alt=""
@@ -629,17 +93,12 @@ function TaskListPage() {
         className="pointer-events-none absolute -bottom-2 right-[25%] z-20 hidden w-44 xl:block"
       />
 
-      {isModalOpen && (
+      {taskList.isModalOpen && (
         <TaskModal
-          isOpen={isModalOpen}
-          taskToEdit={editingTask}
-          onClose={() => {
-            setIsModalOpen(false)
-            setEditingTask(null)
-          }}
-          onSubmit={
-            editingTask ? handleUpdateTask : handleAddTask
-          }
+          isOpen={taskList.isModalOpen}
+          taskToEdit={taskList.editingTask}
+          onClose={taskList.closeModal}
+          onSubmit={taskList.editingTask ? taskList.editTask : taskList.addTask}
         />
       )}
     </PageShell>
