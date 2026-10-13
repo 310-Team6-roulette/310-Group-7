@@ -45,6 +45,7 @@ const NAV_ITEMS = [
     </svg>
   ),
 },
+  {
     label: 'Calendar',
     to: '/calendar',
     icon: (
