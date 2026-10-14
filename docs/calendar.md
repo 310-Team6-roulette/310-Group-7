@@ -29,10 +29,16 @@ There are no automated tests. Verify by hand:
 - Make & delete some applications and see if those changes are reflected in the calendar.
 - Repeat with tasks.
 
+## Components
+
+### CalendarEntry & CalendarTaskEntry
+These two components included in `/components` display an entry in the calendar. The regular entry is used for applications whereas the task entries are used for tasks.
+These contain an SVG icon + a paragraph containing their current status alongside the entry's title.
+The colours are decided by their current status, this can be edited by editing the maps inside of the `.jsx` files.
+
 ## Future work
 
 - Better visuals
 - Toggle to a "week" view
-- Include support for tasks
 
 See [ROADMAP.md](ROADMAP.md) for the full list.

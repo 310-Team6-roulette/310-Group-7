@@ -19,7 +19,7 @@ const MONTHS = [
 function groupByDate(applications) {
   return new Map(
     applications
-      .filter((application) => application.dueDate != null)
+      .filter((application) => application.dueDate != null) // Due dates can be null, filter those apps/tasks out
       .map((application) => [
         new Date(application.dueDate),
         application,
