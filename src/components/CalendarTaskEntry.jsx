@@ -15,7 +15,7 @@ function CalendarTaskEntry({
   return (
     <div className={`rounded-[0.5rem] bg-white px-2 py-1 text-brand-black border-1 ${cols.get(task.status)}`}>
 
-      <p className="truncate text-xs font-medium">
+      <p className="truncate text-xs font-medium select-none">
         <svg
           width="16"
           height="16"
