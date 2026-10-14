@@ -1,26 +1,31 @@
-import { supabase } from './supabaseClient'
+import { savePushSubscription } from './pushSubscriptions'
 
 function decodePublicKey(value) {
   const padding = '='.repeat((4 - (value.length % 4)) % 4)
-  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const base64 = (value + padding).replaceAll('-', '+').replaceAll('_', '/')
   const bytes = atob(base64)
 
-  return Uint8Array.from(bytes, (character) => character.charCodeAt(0))
+  return Uint8Array.from(bytes, (character) => character.codePointAt(0))
+}
+
+function supportsDesktopNotifications() {
+  return 'Notification' in window
 }
 
 export function supportsPushNotifications() {
   return (
+    supportsDesktopNotifications() &&
     'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window
+    'PushManager' in window
   )
 }
 
 export async function enablePushNotifications(userId) {
-  if (!supportsPushNotifications()) return { status: 'unsupported' }
+  if (!supportsDesktopNotifications()) return { status: 'unsupported' }
 
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return { status: permission }
+  if (!supportsPushNotifications()) return { status: 'local-only' }
 
   const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
   if (!publicKey) return { status: 'local-only' }
@@ -35,18 +40,6 @@ export async function enablePushNotifications(userId) {
     })
   }
 
-  const savedSubscription = subscription.toJSON()
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: userId,
-      endpoint: savedSubscription.endpoint,
-      p256dh: savedSubscription.keys?.p256dh,
-      auth: savedSubscription.keys?.auth,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'endpoint' },
-  )
-
-  if (error) throw error
+  await savePushSubscription(userId, subscription)
   return { status: 'subscribed' }
 }

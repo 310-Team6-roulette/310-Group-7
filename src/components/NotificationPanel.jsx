@@ -1,114 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import useDeadlineNotifications from '../hooks/useDeadlineNotifications'
 import { describeDeadline } from '../lib/notifications'
-import { enablePushNotifications } from '../lib/pushNotifications'
-
-function getPermission() {
-  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported'
-  return Notification.permission
-}
-
-function getLocalDateKey() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function getReminderKey(application) {
-  return `${application.id}:${application.dueDate}`
-}
-
-function getDismissedReminders(userId) {
-  try {
-    const value = localStorage.getItem(`pipeline-dismissed-deadlines:${userId}`)
-    return new Set(JSON.parse(value ?? '[]'))
-  } catch {
-    return new Set()
-  }
-}
 
 function NotificationPanel({ reminders, userId, className = '' }) {
-  const [permission, setPermission] = useState(getPermission)
-  const [permissionError, setPermissionError] = useState('')
-  const [pushStatus, setPushStatus] = useState('idle')
-  const [dismissedReminders, setDismissedReminders] = useState(() =>
-    getDismissedReminders(userId),
-  )
-  const visibleReminders = useMemo(
-    () => reminders.filter((application) => !dismissedReminders.has(getReminderKey(application))),
-    [dismissedReminders, reminders],
-  )
-
-  useEffect(() => {
-    if (permission !== 'granted' || visibleReminders.length === 0) return
-
-    const storageKey = `pipeline-deadline-notifications:${userId ?? 'unknown-user'}`
-    const todayKey = getLocalDateKey()
-    let sentNotifications = {}
-
-    try {
-      sentNotifications = JSON.parse(localStorage.getItem(storageKey) ?? '{}')
-    } catch {
-      sentNotifications = {}
-    }
-
-    let changed = false
-
-    visibleReminders.forEach((application) => {
-      const reminderKey = getReminderKey(application)
-      if (sentNotifications[reminderKey] === todayKey) return
-
-      try {
-        new Notification(`${application.company} application ${describeDeadline(application.daysUntilDue)}`, {
-          body: application.role,
-          tag: `application-deadline-${application.id}`,
-        })
-        sentNotifications[reminderKey] = todayKey
-        changed = true
-      } catch (error) {
-        console.error('Desktop notification could not be shown', error)
-      }
-    })
-
-    if (changed) {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(sentNotifications))
-      } catch (error) {
-        console.error('Desktop notification history could not be saved', error)
-      }
-    }
-  }, [permission, userId, visibleReminders])
-
-  function dismissReminder(application) {
-    const nextDismissedReminders = new Set(dismissedReminders)
-    nextDismissedReminders.add(getReminderKey(application))
-    setDismissedReminders(nextDismissedReminders)
-
-    try {
-      localStorage.setItem(
-        `pipeline-dismissed-deadlines:${userId}`,
-        JSON.stringify([...nextDismissedReminders]),
-      )
-    } catch (error) {
-      console.error('Dismissed deadline could not be saved', error)
-    }
-  }
-
-  async function enableAlerts() {
-    setPermissionError('')
-    setPushStatus('loading')
-
-    try {
-      const result = await enablePushNotifications(userId)
-      setPermission(getPermission())
-      setPushStatus(result.status)
-    } catch {
-      setPermission(getPermission())
-      setPushStatus('failed')
-      setPermissionError('Background alerts could not be enabled. In-app alerts still work.')
-    }
-  }
+  const {
+    dismissReminder,
+    enableAlerts,
+    permission,
+    permissionError,
+    pushStatus,
+    visibleReminders,
+  } = useDeadlineNotifications(reminders, userId)
 
   return (
     <section

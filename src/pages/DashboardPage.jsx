@@ -147,8 +147,20 @@ function DashboardPage() {
         ...items,
         [overContainer]: arrayMove(items[overContainer], activeIndex, overIndex),
       }
-      setItems(nextItems)
     }
+
+    if (startContainer && startContainer !== overContainer) {
+      nextItems = {
+        ...nextItems,
+        [overContainer]: nextItems[overContainer].map((application) =>
+          application.id === active.id
+            ? { ...application, status: overContainer }
+            : application,
+        ),
+      }
+    }
+
+    if (nextItems !== items) setItems(nextItems)
 
     updateApplicationPositions(overContainer, nextItems[overContainer]).catch((error) =>
       console.error('Failed to save card position', error),
