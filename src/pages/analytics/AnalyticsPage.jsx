@@ -39,12 +39,22 @@ function AnalyticsContent() {
         </div>
       </header>
 
-      <img src={beaver} alt="" aria-hidden="true" className={`${BEAVER_POSITION} z-0`} />
+      <img
+        src={beaver}
+        alt=""
+        aria-hidden="true"
+        className={`${BEAVER_POSITION} z-0`}
+      />
 
       {isReady && summary.total === 0 && <AnalyticsEmptyState />}
       {isReady && summary.total > 0 && <AnalyticsDashboard summary={summary} />}
 
-      <img src={beaverArms} alt="" aria-hidden="true" className={`${BEAVER_POSITION} z-20`} />
+      <img
+        src={beaverArms}
+        alt=""
+        aria-hidden="true"
+        className={`${BEAVER_POSITION} z-20`}
+      />
     </PageShell>
   )
 }

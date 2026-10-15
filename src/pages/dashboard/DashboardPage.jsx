@@ -16,7 +16,10 @@ import ApplicationCard from '../../components/dashboard/ApplicationCard'
 import ApplicationModal from '../../components/dashboard/ApplicationModal'
 import NotificationPanel from '../../components/dashboard/NotificationPanel'
 import PageGreeting from '../../components/layout/PageGreeting'
-import PageShell, { BEAVER_POSITION, PRIMARY_PILL_CLASSES } from '../../components/layout/PageShell'
+import PageShell, {
+  BEAVER_POSITION,
+  PRIMARY_PILL_CLASSES,
+} from '../../components/layout/PageShell'
 import StatusColumn from '../../components/dashboard/StatusColumn'
 import {
   deleteApplication,

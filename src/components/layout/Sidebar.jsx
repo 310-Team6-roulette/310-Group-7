@@ -122,7 +122,12 @@ const NAV_ITEMS = [
     label: 'Analytics',
     to: '/analytics',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="size-5" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className="size-5"
+        aria-hidden="true"
+      >
         <path
           d="M4 20h16M7 16.5v-5M12 16.5V6.5M17 16.5v-8"
           stroke="currentColor"

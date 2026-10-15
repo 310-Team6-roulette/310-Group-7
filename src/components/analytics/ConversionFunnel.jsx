@@ -12,7 +12,9 @@ function ConversionFunnel({ funnel }) {
       description="How many sent applications reached each stage, including any that went further."
     >
       {first.count === 0 ? (
-        <p className="text-sm">Move an application to Applied / Waiting to start your funnel.</p>
+        <p className="text-sm">
+          Move an application to Applied / Waiting to start your funnel.
+        </p>
       ) : (
         <ol className="space-y-4">
           {funnel.map((stage, index) => {

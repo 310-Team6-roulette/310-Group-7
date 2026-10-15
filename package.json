@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "prettier": "prettier . --check",
+    "prettier": "prettier --write .",
     "codestyle": "eslint . && prettier . --check",
     "prepare": "husky install",
     "test": "vitest"

@@ -24,11 +24,11 @@ function TaskListContent() {
 
   return (
     <PageShell>
-    <header className="mb-6 flex flex-col gap-4 px-1 pt-2 sm:flex-row sm:items-start sm:justify-between sm:px-2 md:pt-7 lg:pt-9">
-      <PageGreeting description="Welcome to your task dashboard">
-        {taskList.isLoading && (
-          <output className="mt-1 text-xs text-brand-black/60">
-            Loading your tasks…
+      <header className="mb-6 flex flex-col gap-4 px-1 pt-2 sm:flex-row sm:items-start sm:justify-between sm:px-2 md:pt-7 lg:pt-9">
+        <PageGreeting description="Welcome to your task dashboard">
+          {taskList.isLoading && (
+            <output className="mt-1 text-xs text-brand-black/60">
+              Loading your tasks…
             </output>
           )}
           {taskList.loadError && (

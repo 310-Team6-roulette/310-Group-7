@@ -30,13 +30,21 @@ function AnalyticsDashboard({ summary }) {
         <StatCard
           label="Applied → Interview"
           value={formatPercentage(conversions.appliedToInterview)}
-          caption={describeConversion(interviewed, sent, 'Send an application to see this')}
+          caption={describeConversion(
+            interviewed,
+            sent,
+            'Send an application to see this'
+          )}
           tone="bg-brand-green"
         />
         <StatCard
           label="Interview → Offer"
           value={formatPercentage(conversions.interviewToOffer)}
-          caption={describeConversion(offered, interviewed, 'Reach an interview to see this')}
+          caption={describeConversion(
+            offered,
+            interviewed,
+            'Reach an interview to see this'
+          )}
           tone="bg-brand-yellow"
         />
       </div>
