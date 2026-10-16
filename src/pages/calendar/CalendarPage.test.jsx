@@ -3,21 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarPage from './CalendarPage'
 import { fetchApplications } from '../../lib/applications'
-
-const taskListMock = vi.hoisted(() => ({
-  tasks: {
-    todo: [],
-    in_progress: [],
-    completed: [],
-  },
-}))
+import { fetchTasksByColumn } from '../../lib/tasks'
 
 vi.mock('../../lib/applications', () => ({
   fetchApplications: vi.fn(),
 }))
 
-vi.mock('../../hooks/useTaskList', () => ({
-  default: () => taskListMock,
+vi.mock('../../lib/tasks', () => ({
+  fetchTasksByColumn: vi.fn(),
+  insertTask: vi.fn(),
+  updateTask: vi.fn(),
+  deleteTask: vi.fn(),
 }))
 
 vi.mock('../../components/layout/PageShell', () => ({
@@ -25,6 +21,9 @@ vi.mock('../../components/layout/PageShell', () => ({
   BEAVER_POSITION: 'beaver-position',
 }))
 
+// Mock CalendarDays
+// Applications will always display as Application: Name to make verifying easier
+// Same goes with tasks, they will always display as Task: Name
 vi.mock('../../components/calendar/CalendarDay', () => ({
   default: ({ title, events, tasks, isCurrent }) => (
     <section aria-label={`Day ${title}`} data-current={isCurrent || undefined}>
@@ -41,6 +40,7 @@ vi.mock('../../components/calendar/CalendarDay', () => ({
   ),
 }))
 
+// Mock applications & tasks
 const HOBBYCON = {
   id: 'application-1',
   company: 'Hobbycon',
@@ -80,6 +80,12 @@ const COMPLETED = {
   status: 'completed',
 }
 
+const TASKS = {
+  todo: [TODO],
+  in_progress: [IN_PROGRESS],
+  completed: [COMPLETED],
+}
+
 const LOADING = /Loading your calendar/i
 
 function deferred() {
@@ -104,12 +110,8 @@ describe('CalendarPage', () => {
     vi.clearAllMocks()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-15T09:00:00Z'))
-    taskListMock.tasks = {
-      todo: [TODO],
-      in_progress: [IN_PROGRESS],
-      completed: [COMPLETED],
-    }
     fetchApplications.mockResolvedValue([HOBBYCON, ARCANE])
+    fetchTasksByColumn.mockResolvedValue(TASKS)
   })
 
   afterEach(() => {
@@ -118,7 +120,7 @@ describe('CalendarPage', () => {
   })
 
   describe('loading', () => {
-    it('shows a loading state until applications have been fetched', async () => {
+    it('shows a loading state until applications & tasks have been fetched', async () => {
       const pending = deferred()
       fetchApplications.mockReturnValueOnce(pending.promise)
 
@@ -129,13 +131,15 @@ describe('CalendarPage', () => {
       pending.resolve([HOBBYCON])
 
       expect(await screen.findByText('Application: Hobbycon')).toBeInTheDocument()
+      expect(await screen.findByText('Task: Prepare portfolio')).toBeInTheDocument()
       expect(screen.queryByText(LOADING)).not.toBeInTheDocument()
     })
 
-    it('fetches applications exactly once on mount', async () => {
+    it('fetches applications & tasks exactly once on mount', async () => {
       await renderLoadedCalendar()
 
       expect(fetchApplications).toHaveBeenCalledTimes(1)
+      expect(fetchTasksByColumn).toHaveBeenCalledTimes(1)
     })
 
     it('stops loading and shows an error when fetching fails', async () => {
@@ -171,7 +175,11 @@ describe('CalendarPage', () => {
 
     it('renders an empty calendar when there are no applications or tasks', async () => {
       fetchApplications.mockResolvedValueOnce([])
-      taskListMock.tasks = { todo: [], in_progress: [], completed: [] }
+      fetchTasksByColumn.mockResolvedValueOnce({
+        todo: [],
+        in_progress: [],
+        completed: [],
+      })
 
       await renderLoadedCalendar()
 
