@@ -42,6 +42,8 @@ counts towards Sent, Interview, and Offer.
 | `interview` | 2 | Sent, Interview |
 | `offer` | 3 | Sent, Interview, Offer |
 
+Any other or missing `status` has no rank and counts towards no stage.
+
 Two consequences follow:
 
 - **Moving a card backwards changes history.** Dragging a card from Interview
