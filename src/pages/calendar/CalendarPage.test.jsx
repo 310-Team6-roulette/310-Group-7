@@ -29,9 +29,7 @@ vi.mock('../../components/calendar/CalendarDay', () => ({
     <section aria-label={`Day ${title}`} data-current={isCurrent || undefined}>
       <h2>{title}</h2>
       {events.map((application) => (
-        <p key={application.id}>
-          Application: {application.company}
-        </p>
+        <p key={application.id}>Application: {application.company}</p>
       ))}
       {tasks.map((task) => (
         <p key={task.id}>Task: {task.title}</p>
@@ -130,8 +128,12 @@ describe('CalendarPage', () => {
 
       pending.resolve([HOBBYCON])
 
-      expect(await screen.findByText('Application: Hobbycon')).toBeInTheDocument()
-      expect(await screen.findByText('Task: Prepare portfolio')).toBeInTheDocument()
+      expect(
+        await screen.findByText('Application: Hobbycon')
+      ).toBeInTheDocument()
+      expect(
+        await screen.findByText('Task: Prepare portfolio')
+      ).toBeInTheDocument()
       expect(screen.queryByText(LOADING)).not.toBeInTheDocument()
     })
 
@@ -159,18 +161,16 @@ describe('CalendarPage', () => {
     it('renders applications and active tasks on their due dates', async () => {
       await renderLoadedCalendar()
 
-      const january10 = within(
-        screen.getByRole('region', { name: 'Day 10' })
-      )
-      const january20 = within(
-        screen.getByRole('region', { name: 'Day 20' })
-      )
+      const january10 = within(screen.getByRole('region', { name: 'Day 10' }))
+      const january20 = within(screen.getByRole('region', { name: 'Day 20' }))
 
       expect(january10.getByText('Application: Hobbycon')).toBeInTheDocument()
       expect(january10.getByText('Task: Prepare portfolio')).toBeInTheDocument()
       expect(january20.getByText('Task: Submit references')).toBeInTheDocument()
       expect(screen.queryByText('Task: Completed task')).not.toBeInTheDocument()
-      expect(screen.queryByText('Application: Arcane Development')).not.toBeInTheDocument()
+      expect(
+        screen.queryByText('Application: Arcane Development')
+      ).not.toBeInTheDocument()
     })
 
     it('renders an empty calendar when there are no applications or tasks', async () => {
@@ -192,18 +192,26 @@ describe('CalendarPage', () => {
     it('shows the current month and moves to the next and previous months', async () => {
       const user = await renderLoadedCalendar()
 
-      expect(screen.getByRole('heading', { name: 'January 2026' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'January 2026' })
+      ).toBeInTheDocument()
 
       await user.click(
         screen.getByRole('button', { name: 'Show February 2026' })
       )
-      expect(screen.getByRole('heading', { name: 'February 2026' })).toBeInTheDocument()
-      expect(screen.getByText('Application: Arcane Development')).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'February 2026' })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText('Application: Arcane Development')
+      ).toBeInTheDocument()
 
       await user.click(
         screen.getByRole('button', { name: 'Show January 2026' })
       )
-      expect(screen.getByRole('heading', { name: 'January 2026' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'January 2026' })
+      ).toBeInTheDocument()
       expect(screen.getByText('Application: Hobbycon')).toBeInTheDocument()
     })
 
@@ -213,12 +221,16 @@ describe('CalendarPage', () => {
       await user.click(
         screen.getByRole('button', { name: 'Show December 2025' })
       )
-      expect(screen.getByRole('heading', { name: 'December 2025' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'December 2025' })
+      ).toBeInTheDocument()
 
       await user.click(
         screen.getByRole('button', { name: 'Show January 2026' })
       )
-      expect(screen.getByRole('heading', { name: 'January 2026' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'January 2026' })
+      ).toBeInTheDocument()
     })
   })
 })
