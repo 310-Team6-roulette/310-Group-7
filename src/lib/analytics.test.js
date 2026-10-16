@@ -46,11 +46,13 @@ describe('countReached', () => {
     expect(countReached(rejected, 'offer')).toBe(0)
   })
 
-  it('treats unknown or missing statuses as To apply', () => {
+  it('ignores unknown or missing statuses', () => {
     const unknown = [app('archived'), app(undefined), {}]
 
-    expect(countReached(unknown, 'to_apply')).toBe(3)
+    expect(countReached(unknown, 'to_apply')).toBe(0)
     expect(countReached(unknown, 'applied')).toBe(0)
+    expect(countReached(unknown, 'interview')).toBe(0)
+    expect(countReached(unknown, 'offer')).toBe(0)
   })
 
   it('counts stages across a mixed set of applications', () => {
