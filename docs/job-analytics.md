@@ -43,6 +43,8 @@ counts towards Sent, Interview, and Offer.
 | `offer` | 3 | Sent, Interview, Offer |
 
 Any other or missing `status` has no rank and counts towards no stage.
+**UPON ADDING A NEW STATUS**, confirm whether it needs a new rank and how it should 
+be handled by countReached.
 
 Two consequences follow:
 
