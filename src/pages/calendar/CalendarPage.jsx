@@ -226,7 +226,7 @@ function CalendarPage() {
             daysInPrevMonth -
             (firstDayIndex - index) +
             1
-          ).toString();
+          ).toString()
 
           return (
             <CalendarDay
@@ -241,11 +241,11 @@ function CalendarPage() {
               )}
               tasks={[]}
             />
-          );
+          )
         })}
 
         {Array.from({ length: daysInMonth }).map((_, index) => {
-          const dayIndex = getDayIndex(index, daysInMonth).toString();
+          const dayIndex = getDayIndex(index, daysInMonth).toString()
 
           return (
             <CalendarDay
@@ -260,11 +260,11 @@ function CalendarPage() {
                 today.getDate() === index + 1
               }
             />
-          );
+          )
         })}
 
         {Array.from({ length: daysInNextMonth }).map((_, index) => {
-          const dayIndex = (index + 1).toString();
+          const dayIndex = (index + 1).toString()
 
           return (
             <CalendarDay
@@ -279,7 +279,7 @@ function CalendarPage() {
               )}
               tasks={[]}
             />
-          );
+          )
         })}
       </div>
 
